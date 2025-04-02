@@ -12,7 +12,7 @@ output/
 .env
 .env.local
 .env.*.local
-.env.public  # Exportado automáticamente, mejor no trackearlo
+.env.public
 
 # 🌐 Config / Log Files
 *.log
