@@ -1,0 +1,45 @@
+# 🔥 Node Modules
+node_modules/
+build/
+dist/
+
+# 🚀 Vite Output
+.vite/
+.cache/
+output/
+
+# 📂 Environment Files
+.env
+.env.local
+.env.*.local
+.env.public  # Exportado automáticamente, mejor no trackearlo
+
+# 🌐 Config / Log Files
+*.log
+yarn.lock
+npm-debug.log*
+pnpm-lock.yaml
+.DS_Store
+
+# 💅 IDE / Editor Configs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 📦 Dependencies Cache
+*.tgz
+
+# 📸 Testing Output
+coverage/
+jest-coverage/
+cypress/videos/
+cypress/screenshots/
+
+# 📂 Temporary Files
+temp/
+tmp/
+*.tmp
+
+# 🔥 Frontend Build Files
+out/
