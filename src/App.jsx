@@ -1,36 +1,34 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
-import ActorList from "./components/ActorList";
-import RegisterDrug from "./components/RegisterDrug";
-import TransferDrug from "./components/TransferDrug";
-import TraceDrug from "./components/TraceDrug";
-import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
+import { useMemo } from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { CssBaseline, ThemeProvider, useMediaQuery } from "@mui/material";
+import { buildTheme } from "./theme.js";
+import Layout from "./components/Layout.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import Trace from "./pages/Trace.jsx";
+import Register from "./pages/Register.jsx";
+import Transfer from "./pages/Transfer.jsx";
+import Cargo from "./pages/Cargo.jsx";
+import NotFound from "./pages/NotFound.jsx";
 
-const theme = createTheme({
-    palette: {
-        primary: { main: "#1976d2" },
-        secondary: { main: "#dc004e" },
-        background: { default: "#f4f6f8" },
-    },
-    typography: { fontFamily: "Roboto, sans-serif" },
-});
+export default function App() {
+    const prefersDark = useMediaQuery("(prefers-color-scheme: dark)");
+    const theme = useMemo(() => buildTheme(prefersDark ? "dark" : "light"), [prefersDark]);
 
-const App = () => {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            <Router>
-                <Navbar />
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Routes>
-                    <Route path="/" element={<ActorList />} />
-                    <Route path="/register" element={<RegisterDrug />} />
-                    <Route path="/transfer" element={<TransferDrug />} />
-                    <Route path="/trace" element={<TraceDrug />} />
+                    <Route element={<Layout />}>
+                        <Route index element={<Dashboard />} />
+                        <Route path="trace/:batchId?" element={<Trace />} />
+                        <Route path="register" element={<Register />} />
+                        <Route path="transfer" element={<Transfer />} />
+                        <Route path="cargo" element={<Cargo />} />
+                        <Route path="*" element={<NotFound />} />
+                    </Route>
                 </Routes>
-            </Router>
+            </BrowserRouter>
         </ThemeProvider>
     );
-};
-
-export default App;
+}
