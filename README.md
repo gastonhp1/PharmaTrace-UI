@@ -4,6 +4,28 @@ Interfaz web de [PharmaTrace](https://github.com/gastonhp1/PharmaTrace) (React +
 únicamente con la API REST del backend; no se conecta a la blockchain ni a ninguna wallet: las
 operaciones las firma el backend con la clave del dueño actual de cada lote o cargamento.
 
+![Inicio: estado de la API y cadena de custodia](docs/screenshots/inicio.png)
+
+## Capturas
+
+Trazabilidad de un lote que recorrió toda la cadena hasta quedar «En uso»:
+
+![Trazar un lote](docs/screenshots/trazar.png)
+
+Transferir un lote: se elige el destinatario y el estado se deriva solo (solo está habilitado el siguiente actor de la cadena):
+
+![Transferir un lote](docs/screenshots/transferir.png)
+
+Cargamentos: los lotes se mueven juntos y toman el estado del receptor:
+
+![Cargamentos](docs/screenshots/cargamentos.png)
+
+En el celular (sin scroll horizontal):
+
+<img src="docs/screenshots/trazar-mobile.png" alt="Trazar un lote en el celular" width="300">
+
+> Las capturas se sacaron contra el backend real, en local, con datos de demo.
+
 ## Pantallas
 
 | Ruta | Qué hace | Endpoint |
