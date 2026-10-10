@@ -52,7 +52,7 @@ Con el backend y la red local levantados (ver el README del backend: `npx hardha
 | Variable | Para qué |
 | --- | --- |
 | `VITE_API_URL` | URL de la **API** (por defecto `http://localhost:3001`). No es el nodo de Hardhat (`:8545`). |
-| `VITE_API_KEY` | Opcional. Se manda como `x-api-key` si el backend la exige (rama `feat/api-key-auth`). Todo `VITE_*` queda visible en el bundle: solo para desarrollo local. |
+| `VITE_API_KEY` | Se manda como `x-api-key`. El backend la exige en todas las escrituras (valor de `API_KEY` en `backend/.env`, que genera `npm run deploy:all`), salvo que corra con `AUTH_DISABLED=true`. Todo `VITE_*` queda visible en el bundle: solo para desarrollo local. |
 
 ### Direcciones de los actores
 
