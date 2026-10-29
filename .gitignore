@@ -7,10 +7,6 @@ dist/
 .env.*.local
 .env.public
 
-# Los escribe el deploy del backend (npm run deploy:all / export:frontend); este UI no los usa
-src/abi/
-src/config/contract-address.js
-
 *.log
 .DS_Store
 .idea/

@@ -7,9 +7,9 @@ export default function NotFound() {
         <>
             <PageHeader title="Página no encontrada" />
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-                Esa dirección no existe en PharmaTrace.
+                Esa dirección no existe en el UI.
             </Typography>
-            <Button variant="contained" component={RouterLink} to="/">
+            <Button component={RouterLink} to="/" variant="contained">
                 Volver al inicio
             </Button>
         </>

@@ -1,44 +1,23 @@
-// Cliente de la API REST del backend de PharmaTrace (backend/server.js).
+// Cliente de la API REST de PharmaTrace sobre Hyperledger Fabric (backend/).
 //
-// Todos los errores del backend llegan como `{ "error": "<motivo>" }` con un código HTTP 4xx/5xx,
-// así que acá se convierten en una excepción `ApiError`: quien llama nunca tiene que revisar
-// `response.ok` ni adivinar si una operación salió bien.
+// Los errores del backend llegan como `{ "error": "<motivo>" }` con un código HTTP 4xx/5xx. Acá
+// se convierten en una excepción `ApiError` con el mensaje ya traducido, así que quien llama
+// nunca revisa `response.ok` ni adivina si una operación salió bien.
+//
+// El backend es custodial: cada operación la firma con la identidad de la org que corresponde
+// (el dueño del lote, quien lo recibe, el regulador). El UI no elige quién firma; solo manda
+// qué se quiere hacer. Las escrituras (y leer condiciones comerciales) exigen `x-api-key`.
 
+import { getApiKey } from "./apiKey.js";
+import { translateError } from "./errorMessages.js";
+
+// "/" (la API en el mismo origen, detrás del ingress) queda como "" y las rutas son /api/...
 const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:3001").replace(/\/+$/, "");
-const API_KEY = import.meta.env.VITE_API_KEY || "";
 
-export const API_URL = BASE_URL;
-
-// Motivos de revert de los contratos (ver backend/utils/errors.js) -> mensaje para la persona.
-const MESSAGES = {
-    "Drug does not exist.": "El lote no existe.",
-    "You are not the current owner.": "Quien firma no es el dueño actual del lote.",
-    "Only the contract owner can perform this action.": "Solo el dueño del contrato (el laboratorio) puede hacer esto.",
-    "Drug already registered.": "Ya existe un lote con ese ID.",
-    "Invalid state transition.": "Transición de estado inválida: el lote no puede retroceder.",
-    "Invalid recipient address.": "La dirección de destino no es válida.",
-    "Invalid recipient role": "El destinatario no es el siguiente actor de la cadena.",
-    "State does not match recipient role": "El estado no coincide con el rol del destinatario.",
-    "Drug is in a cargo": "El lote está dentro de un cargamento: se mueve junto con el cargamento.",
-    "Drug is already in a cargo": "El lote ya está en un cargamento.",
-    "Drug is not in a cargo": "El lote no está en un cargamento.",
-    "Drug must be delivered first": "El lote tiene que estar entregado antes de marcarlo en uso.",
-    "Only patients can mark a drug as in use": "Solo un paciente puede marcar el lote en uso.",
-    "Cargo not found": "El cargamento no existe.",
-    "Cargo does not exist": "El cargamento no existe.",
-    "Only owner can transfer": "Solo el dueño actual puede transferir el cargamento.",
-    "Only current owner can mark delivered": "Solo el dueño actual puede marcar el cargamento como entregado.",
-    "Sender does not own all drugs": "Quien firma no es dueño de todos los lotes del cargamento.",
-    "Cargo already exists": "Ya existe un cargamento con ese ID.",
-    "Cargo already delivered": "El cargamento ya fue entregado.",
-    "Cargo must have at least one drug": "El cargamento necesita al menos un lote.",
-    "Too many drugs in a cargo": "Demasiados lotes en un cargamento (máximo 100).",
-    "All batches in a cargo must have the same current owner":
-        "Todos los lotes del cargamento tienen que tener el mismo dueño actual.",
-};
+export const API_URL = BASE_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
 export class ApiError extends Error {
-    constructor(message, { status = 0, raw = message } = {}) {
+    constructor(message, { status = 0, raw = "" } = {}) {
         super(message);
         this.name = "ApiError";
         this.status = status;
@@ -46,21 +25,11 @@ export class ApiError extends Error {
     }
 }
 
-function friendlyMessage(status, raw) {
-    if (MESSAGES[raw]) return MESSAGES[raw];
-    if (raw?.startsWith("No signing key is configured")) {
-        return "El backend no tiene configurada la clave del dueño actual (revisá las *_KEY de backend/.env).";
-    }
-    if (status === 401) return "El backend exige la clave de API (x-api-key). Configurá VITE_API_KEY en .env.";
-    if (status === 503) return "El backend no tiene API_KEY configurada.";
-    if (status >= 500) return `${raw || `Error ${status}`}. Es un error inesperado del backend: reintentá y, si sigue, mirá su log.`;
-    return raw || `Error ${status}`;
-}
-
 async function request(path, { method = "GET", body } = {}) {
     const headers = {};
     if (body !== undefined) headers["Content-Type"] = "application/json";
-    if (API_KEY) headers["x-api-key"] = API_KEY;
+    const key = getApiKey();
+    if (key) headers["x-api-key"] = key;
 
     let response;
     try {
@@ -70,56 +39,102 @@ async function request(path, { method = "GET", body } = {}) {
             body: body === undefined ? undefined : JSON.stringify(body),
         });
     } catch {
-        throw new ApiError(`No se pudo conectar con la API en ${BASE_URL}. ¿Está levantado el backend?`);
+        throw new ApiError(`No se pudo conectar con la API en ${API_URL}. ¿Está levantado el backend?`);
     }
 
+    const text = await response.text();
     let data = null;
+    let isJson = true;
     try {
-        data = await response.json();
+        data = text === "" ? null : JSON.parse(text);
     } catch {
-        // respuesta sin cuerpo JSON
+        isJson = false;
     }
 
     if (!response.ok) {
-        const raw = data?.error ?? "";
-        throw new ApiError(friendlyMessage(response.status, raw), { status: response.status, raw });
+        const raw = isJson && data && typeof data.error === "string" ? data.error : "";
+        throw new ApiError(translateError(response.status, raw), { status: response.status, raw });
+    }
+    if (!isJson) {
+        // Pasa cuando algo que no es la API contesta en esa URL (por ejemplo nginx devolviendo index.html).
+        throw new ApiError(`${API_URL} no respondió como la API de PharmaTrace.`, { status: response.status });
     }
     return data;
 }
 
 const enc = encodeURIComponent;
+const post = (path, body = {}) => request(path, { method: "POST", body });
 
-// ---- Salud -----------------------------------------------------------------------------------
-// GET / responde con texto plano si el backend está arriba.
-export async function pingApi() {
+// ---- Salud ------------------------------------------------------------------------------------
+// No usa /healthz: detrás de nginx (la imagen del UI) ese path lo contesta nginx aunque la API
+// esté caída. En cambio GET /api/orgs/LabMSP lo contesta solo la API: 200 o 404 (todavía no
+// registrada) quieren decir que la API y la red responden; 503, que la API está pero la red Fabric no.
+export async function checkApi() {
     try {
-        const response = await fetch(`${BASE_URL}/`);
-        return response.ok;
-    } catch {
-        return false;
+        await request("/api/orgs/LabMSP");
+        return { state: "ok" };
+    } catch (error) {
+        if (!(error instanceof ApiError)) return { state: "offline", message: String(error) };
+        if (error.status === 404) return { state: "ok", orgsRegistered: false };
+        if (error.status === 503) return { state: "ledger-down", message: error.message };
+        if (error.status === 0 || error.status === 200) return { state: "offline", message: error.message };
+        return { state: "error", message: error.message };
     }
 }
 
-// ---- Lotes -----------------------------------------------------------------------------------
-// -> { name, manufacturer, productionDate, currentState, currentOwner, inCargo, history[] }
-export const traceDrug = (batchId) => request(`/api/drug/${enc(batchId)}`);
+// ---- Organizaciones ---------------------------------------------------------------------------
+export const getOrg = (mspId) => request(`/api/orgs/${enc(mspId)}`);
+export const listBatchesByOrg = (mspId) => request(`/api/orgs/${enc(mspId)}/batches`);
+export const registerOrg = ({ mspId, role }) => post("/api/orgs", { mspId, role });
 
-export const registerDrug = ({ batchId, drugName, manufacturer }) =>
-    request("/api/register", { method: "POST", body: { batchId, drugName, manufacturer } });
+// ---- Lotes ------------------------------------------------------------------------------------
+// batch: { id, gtin, product, lot, expiryDate, manufacturer, owner, pendingTo, state, cargo,
+//          patientRef, recallReason, stateBefore, lastUpdatedAt, lastTxId }
+export const getBatch = (batchId) => request(`/api/batches/${enc(batchId)}`);
+// -> [{ txId, timestamp, isDelete, batch }] del más viejo al más nuevo
+export const getBatchHistory = (batchId) => request(`/api/batches/${enc(batchId)}/history`);
 
-export const transferDrug = ({ batchId, toAddress, newState }) =>
-    request("/api/transfer", { method: "POST", body: { batchId, toAddress, newState } });
+export const registerBatch = ({ batchId, gtin, product, lot, expiryDate }) =>
+    post("/api/batches", { batchId, gtin, product, lot, expiryDate });
+export const dispatchBatch = ({ batchId, to }) => post(`/api/batches/${enc(batchId)}/dispatch`, { to });
+export const receiveBatch = ({ batchId }) => post(`/api/batches/${enc(batchId)}/receive`);
+export const dispenseBatch = ({ batchId, patientRef }) => post(`/api/batches/${enc(batchId)}/dispense`, { patientRef });
+export const recallBatch = ({ batchId, reason }) => post(`/api/batches/${enc(batchId)}/recall`, { reason });
 
-export const markInUse = (batchId) => request("/api/mark-in-use", { method: "POST", body: { batchId } });
+// ---- Condiciones comerciales (privadas entre vendedor y comprador) ------------------------------
+export const setTerms = ({ batchId, buyer, unitPrice, currency, quantity }) =>
+    request(`/api/batches/${enc(batchId)}/terms`, { method: "PUT", body: { buyer, unitPrice, currency, quantity } });
+// leg: "manufacturer" | "distributor" (el rol del vendedor). as: MSP de quien lee.
+export const readTerms = ({ batchId, leg, as }) =>
+    request(`/api/batches/${enc(batchId)}/terms?leg=${enc(leg)}&as=${enc(as)}`);
+// -> { matches: boolean }
+export const verifyTerms = ({ batchId, leg, seller, buyer, unitPrice, currency, quantity }) =>
+    post(`/api/batches/${enc(batchId)}/terms/verify`, { leg, seller, buyer, unitPrice, currency, quantity });
 
-// ---- Cargamentos -----------------------------------------------------------------------------
-// -> { cargoId, batchIds[], createdBy, currentOwner, createdAt (ISO), delivered }
+// ---- Cargamentos ------------------------------------------------------------------------------
+// cargo: { id, owner, pendingTo, batchIds, state, createdAt, updatedAt }
 export const getCargo = (cargoId) => request(`/api/cargo/${enc(cargoId)}`);
+export const createCargo = ({ cargoId, batchIds }) => post("/api/cargo", { cargoId, batchIds });
+export const dispatchCargo = ({ cargoId, to }) => post(`/api/cargo/${enc(cargoId)}/dispatch`, { to });
+export const receiveCargo = ({ cargoId }) => post(`/api/cargo/${enc(cargoId)}/receive`);
+export const dissolveCargo = ({ cargoId }) => post(`/api/cargo/${enc(cargoId)}/dissolve`);
 
-export const createCargo = ({ cargoId, batchIds }) =>
-    request("/api/cargo/create", { method: "POST", body: { cargoId, batchIds } });
+// ---- Cadena de frío (valija IoT) --------------------------------------------------------------
+// -> { cargoId, verdict, reason, deviceId, policy, startedAt, closed, excursionSeconds,
+//      anchoredReadings, anchorCount, events[], pendingReadings, lastReading }
+export const getColdChain = (cargoId) => request(`/api/iot/cargo/${enc(cargoId)}`);
+// -> { cargoId, seq, anchorIndex, leaf, proof[], root, payload, signature, reading, verifiedOnLedger? }
+export const getReadingProof = ({ cargoId, seq, verify = true }) =>
+    request(`/api/iot/cargo/${enc(cargoId)}/proof/${enc(seq)}${verify ? "?verify=true" : ""}`);
+export const getDevice = (deviceId) => request(`/api/iot/devices/${enc(deviceId)}`);
 
-export const transferCargo = ({ cargoId, toAddress, newState }) =>
-    request("/api/cargo/transfer", { method: "POST", body: { cargoId, toAddress, newState } });
-
-export const deliverCargo = (cargoId) => request("/api/cargo/deliver", { method: "POST", body: { cargoId } });
+export const anchorReadings = ({ cargoId }) => post(`/api/iot/cargo/${enc(cargoId)}/anchor`);
+export const closeMonitoring = ({ cargoId }) => post("/api/iot/monitoring/close", { cargoId });
+export const startMonitoring = ({ cargoId, deviceId, policyId }) =>
+    post("/api/iot/monitoring/start", { cargoId, deviceId, policyId });
+// Temperaturas en centésimas de grado (2,00 °C = 200).
+export const setPolicy = ({ policyId, minTemp, maxTemp, maxExcursionSeconds }) =>
+    post("/api/iot/policies", { policyId, minTemp, maxTemp, maxExcursionSeconds });
+export const registerDevice = ({ deviceId, pubKey, calibrationExpiry, org }) =>
+    post("/api/iot/devices", { deviceId, pubKey, calibrationExpiry, ...(org ? { org } : {}) });
+export const authorizeGateway = () => post("/api/iot/gateway/authorize");

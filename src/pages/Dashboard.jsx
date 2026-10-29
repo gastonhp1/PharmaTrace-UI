@@ -1,153 +1,128 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { Box, Button, Card, CardActionArea, CardContent, Chip, Stack, Typography } from "@mui/material";
-import ScienceIcon from "@mui/icons-material/Science";
-import LocalShippingIcon from "@mui/icons-material/LocalShipping";
-import WarehouseIcon from "@mui/icons-material/Warehouse";
-import LocalPharmacyIcon from "@mui/icons-material/LocalPharmacy";
-import PersonIcon from "@mui/icons-material/Person";
-import SearchIcon from "@mui/icons-material/Search";
-import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
-import Inventory2Icon from "@mui/icons-material/Inventory2";
+import { Alert, Button, Card, CardActionArea, CardContent, Chip, Stack, Typography } from "@mui/material";
+import Grid from "@mui/material/Grid2";
+import AddBoxIcon from "@mui/icons-material/AddBoxOutlined";
+import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
+import LocalShippingIcon from "@mui/icons-material/LocalShippingOutlined";
+import AcUnitIcon from "@mui/icons-material/AcUnit";
+import * as api from "../api.js";
+import { ORG_LIST, ROLE_LABEL } from "../domain.js";
 import PageHeader from "../components/PageHeader.jsx";
-import AddressChip from "../components/AddressChip.jsx";
-import { API_URL, pingApi } from "../api.js";
-import { CHAIN, STATES } from "../domain.js";
-
-const ACTOR_ICONS = {
-    laboratory: ScienceIcon,
-    distributor: LocalShippingIcon,
-    warehouse: WarehouseIcon,
-    pharmacy: LocalPharmacyIcon,
-    patient: PersonIcon,
-};
+import ErrorAlert from "../components/ErrorAlert.jsx";
 
 const SHORTCUTS = [
-    { to: "/trace", title: "Trazar un lote", text: "Estado actual y recorrido completo.", icon: SearchIcon },
-    { to: "/register", title: "Registrar un lote", text: "Da de alta un lote nuevo (lo firma el laboratorio).", icon: AddCircleOutlineIcon },
-    { to: "/transfer", title: "Transferir un lote", text: "Pasalo al siguiente actor de la cadena.", icon: SwapHorizIcon },
-    { to: "/cargo", title: "Cargamentos", text: "Agrupá lotes y movelos juntos.", icon: Inventory2Icon },
+    { to: "/register", title: "Registrar lote", text: "El laboratorio da de alta un lote nuevo.", icon: AddBoxIcon },
+    { to: "/batches", title: "Lotes", text: "Buscar, despachar, recibir, dispensar o retirar.", icon: InventoryIcon },
+    { to: "/cargo", title: "Cargamentos", text: "Mover varios lotes juntos.", icon: LocalShippingIcon },
+    { to: "/coldchain", title: "Cadena de frío", text: "Veredicto y pruebas de la valija IoT.", icon: AcUnitIcon },
 ];
 
+// Una org consultada: { mspId, org|null, count|null }
+async function loadOrg(mspId) {
+    const base = ORG_LIST.find((o) => o.mspId === mspId);
+    // El regulador no se registra en la red: es una identidad fija del chaincode (RegMSP).
+    if (mspId === "RegMSP") return { ...base, org: { mspId, role: "regulator" }, count: null };
+    let org = null;
+    try {
+        org = await api.getOrg(mspId);
+    } catch (error) {
+        if (error.status !== 404) throw error;
+    }
+    let count = null;
+    if (org) count = ((await api.listBatchesByOrg(mspId)) ?? []).length;
+    return { ...base, org, count };
+}
+
 export default function Dashboard() {
-    const [online, setOnline] = useState(null); // null = verificando
+    const [orgs, setOrgs] = useState(null);
+    const [error, setError] = useState(null);
 
-    const check = useCallback(async () => {
-        setOnline(null);
-        setOnline(await pingApi());
+    const load = useCallback(async () => {
+        setError(null);
+        try {
+            setOrgs(await Promise.all(ORG_LIST.map((o) => loadOrg(o.mspId))));
+        } catch (e) {
+            setError(e);
+        }
     }, []);
-
     useEffect(() => {
-        check();
-    }, [check]);
+        load();
+    }, [load]);
+
+    const missing = orgs?.filter((o) => !o.org) ?? [];
 
     return (
         <>
-            <PageHeader
-                title="PharmaTrace"
-                subtitle="Trazabilidad de medicamentos sobre blockchain: de la fábrica al paciente."
-            />
+            <PageHeader title="Inicio" subtitle="Trazabilidad de medicamentos sobre Hyperledger Fabric: del laboratorio al paciente." />
+            <ErrorAlert error={error} sx={{ mb: 2 }} />
 
-            <Card sx={{ mb: 4 }}>
-                <CardContent>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
-                        <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                API
-                            </Typography>
-                            <Chip
-                                size="small"
-                                label={online === null ? "Verificando…" : online ? "En línea" : "Sin conexión"}
-                                color={online === null ? "default" : online ? "success" : "error"}
-                            />
-                            <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
-                            >
-                                {API_URL}
-                            </Typography>
-                        </Stack>
-                        <Button size="small" onClick={check} disabled={online === null}>
-                            Reintentar
-                        </Button>
-                    </Stack>
-                    {online === false && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-                            Levantá el backend (<code>cd backend && npm start</code>) o corregí <code>VITE_API_URL</code> en{" "}
-                            <code>.env</code>. Tiene que apuntar a la API (puerto 3001), no al nodo de Hardhat.
-                        </Typography>
-                    )}
-                </CardContent>
-            </Card>
+            {missing.length > 0 && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                    Faltan organizaciones por registrar en la red: {missing.map((o) => o.mspId).join(", ")}. Las registra el regulador antes de operar.
+                </Alert>
+            )}
 
-            <Typography variant="h5" gutterBottom>
-                Cadena de custodia
+            <Typography variant="h6" sx={{ mb: 1.5 }}>
+                Organizaciones
             </Typography>
-            <Typography color="text.secondary" sx={{ mb: 2 }}>
-                Un lote solo puede pasar al siguiente actor, y el estado lo fija el rol de quien lo recibe. Al final, el
-                paciente lo marca «{STATES[5].label}».
-            </Typography>
-            <Box
-                sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(5, 1fr)" },
-                    gap: 2,
-                    mb: 5,
-                }}
-            >
-                {CHAIN.map((actor, i) => {
-                    const Icon = ACTOR_ICONS[actor.key];
-                    return (
-                        <Card key={actor.key}>
+            <Grid container spacing={2} sx={{ mb: 4 }}>
+                {(orgs ?? ORG_LIST.map((o) => ({ ...o, loading: true }))).map((o) => (
+                    <Grid key={o.mspId} size={{ xs: 12, sm: 6, md: 3 }}>
+                        <Card sx={{ height: "100%" }}>
                             <CardContent>
-                                <Stack spacing={1} alignItems="flex-start">
-                                    <Stack direction="row" alignItems="center" gap={1} sx={{ color: "primary.main" }}>
-                                        <Icon />
-                                        <Typography variant="overline" color="text.secondary">
-                                            {i + 1} de {CHAIN.length}
-                                        </Typography>
-                                    </Stack>
-                                    <Typography variant="h6">{actor.label}</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {i === 0 ? "Registra los lotes" : `Estado al recibir: ${STATES[i].label}`}
-                                    </Typography>
-                                    <AddressChip address={actor.address} showRole={false} />
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                    {o.label}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                                    {o.mspId}
+                                </Typography>
+                                <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", rowGap: 1 }}>
+                                    {o.loading ? (
+                                        <Chip size="small" label="Consultando…" />
+                                    ) : o.org ? (
+                                        <>
+                                            <Chip size="small" color="success" variant="outlined" label={ROLE_LABEL[o.org.role] ?? o.org.role} />
+                                            {o.count !== null && <Chip size="small" label={`${o.count} ${o.count === 1 ? "lote" : "lotes"}`} />}
+                                        </>
+                                    ) : (
+                                        <Chip size="small" color="warning" label="Sin registrar" />
+                                    )}
                                 </Stack>
                             </CardContent>
                         </Card>
-                    );
-                })}
-            </Box>
+                    </Grid>
+                ))}
+            </Grid>
 
-            <Typography variant="h5" gutterBottom>
-                ¿Qué querés hacer?
+            <Typography variant="h6" sx={{ mb: 1.5 }}>
+                Qué querés hacer
             </Typography>
-            <Box
-                sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
-                    gap: 2,
-                }}
-            >
+            <Grid container spacing={2}>
                 {SHORTCUTS.map((shortcut) => {
                     const Icon = shortcut.icon;
                     return (
-                        <Card key={shortcut.to}>
-                            <CardActionArea component={RouterLink} to={shortcut.to} sx={{ height: "100%" }}>
-                                <CardContent>
-                                    <Icon color="primary" sx={{ mb: 1 }} />
-                                    <Typography variant="h6">{shortcut.title}</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {shortcut.text}
-                                    </Typography>
-                                </CardContent>
-                            </CardActionArea>
-                        </Card>
+                        <Grid key={shortcut.to} size={{ xs: 12, sm: 6 }}>
+                            <Card>
+                                <CardActionArea component={RouterLink} to={shortcut.to}>
+                                    <CardContent sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                                        <Icon color="primary" fontSize="large" />
+                                        <div>
+                                            <Typography sx={{ fontWeight: 600 }}>{shortcut.title}</Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {shortcut.text}
+                                            </Typography>
+                                        </div>
+                                    </CardContent>
+                                </CardActionArea>
+                            </Card>
+                        </Grid>
                     );
                 })}
-            </Box>
+            </Grid>
+            <Button onClick={load} sx={{ mt: 3 }}>
+                Actualizar
+            </Button>
         </>
     );
 }
