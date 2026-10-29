@@ -1,23 +1,15 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 
-// Confirmación para acciones que no se pueden deshacer en la blockchain.
-export default function ConfirmDialog({ open, title, text, confirmLabel = "Confirmar", onConfirm, onClose }) {
+export default function ConfirmDialog({ open, title, text, confirmLabel = "Confirmar", color = "primary", onConfirm, onClose }) {
     return (
-        <Dialog open={open} onClose={onClose} aria-labelledby="confirm-title">
-            <DialogTitle id="confirm-title">{title}</DialogTitle>
+        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+            <DialogTitle>{title}</DialogTitle>
             <DialogContent>
                 <DialogContentText>{text}</DialogContentText>
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Cancelar</Button>
-                <Button
-                    variant="contained"
-                    autoFocus
-                    onClick={() => {
-                        onClose();
-                        onConfirm();
-                    }}
-                >
+                <Button variant="contained" color={color} onClick={onConfirm} autoFocus>
                     {confirmLabel}
                 </Button>
             </DialogActions>

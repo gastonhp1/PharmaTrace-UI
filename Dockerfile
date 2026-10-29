@@ -1,6 +1,8 @@
 # Static build of the UI served by unprivileged nginx on :8080.
 # VITE_* values are baked in at build time. The default "/" makes the UI call the
 # API on its own origin (/api/...), which is how the cluster routes it.
+# Leave VITE_API_KEY empty for real deployments: anything baked in is readable in the bundle.
+# Users load the API key at runtime from the key button in the UI (kept in sessionStorage).
 FROM node:22-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
