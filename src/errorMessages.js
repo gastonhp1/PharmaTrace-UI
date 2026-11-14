@@ -102,6 +102,7 @@ const RULES = [
     [/^(\w+) must be an integer between .*$/, (field) => `El campo «${field}» tiene que ser un entero dentro del rango permitido.`],
     [/^Missing or invalid API key$/, () => "La clave de API falta o es incorrecta."],
     [/^API_KEY is not configured on the server.*$/, () => "El backend no tiene API_KEY configurada, así que rechaza las escrituras (para desarrollo local: AUTH_DISABLED=true)."],
+    [/^(\S+) identity .* has no iot-gateway role in its certificate$/, (msp) => `La identidad del gateway de ${msp} no tiene el rol iot-gateway en su certificado: no se la puede autorizar.`],
     [/^No Fabric identity is configured for (.+)$/, (msp) => `El backend no tiene una identidad Fabric configurada para ${msp}.`],
     [/^Fabric identity (.+) not found under .*$/, (id) => `El backend no encontró los certificados de la identidad ${id}: ¿está levantada la red?`],
     [/^The Fabric network is not reachable$/, () => "El backend no llega a la red Fabric. ¿Están levantados los peers?"],

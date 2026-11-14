@@ -8,25 +8,27 @@ connects to the Fabric network or handles identities. The backend is custodial: 
 operation with the identity of the organization that has to act (the batch owner, the recipient, the
 regulator).
 
-![Home: consortium organizations and shortcuts](docs/screenshots/inicio.png)
+![Network overview: custody per organization, recalls and batches about to expire](docs/screenshots/inicio.png)
 
 ## What you can do
 
 | Screen | Route | What it does |
 | --- | --- | --- |
-| Home | `/` | Consortium organizations, their role and how many batches each one holds |
-| Batches | `/batches/:batchId?` | Look up a batch or list an organization's batches; dispatch, receive, dispense, recall; commercial terms; on-chain history |
+| Overview | `/` | How many batches each link of the chain holds, market recalls and batches about to expire |
+| Batch formulary | `/batches/:batchId?` | Alphabetical index of every batch, filtered by text or state. Each batch opens its record: label, route, actions (dispatch, receive, dispense, recall), commercial terms and history |
 | Register batch | `/register` | The manufacturer registers a batch (8–14 digit GTIN, expiry date) |
 | Cargoes | `/cargo/:cargoId?` | Group several batches into a cargo, dispatch, receive or dissolve it |
 | Cold chain | `/coldchain/:cargoId?` | IoT case verdict, last reading, events and a Merkle proof for each reading; operator setup |
 
-A batch that went through the whole chain, with its transaction history:
+The search box in the top bar finds batches by product, lot number, GTIN or ID from any screen.
 
-![A dispensed batch and its history](docs/screenshots/lote.png)
+The formulary: every batch on the network, sorted by product:
 
-Batches held by an organization, with expiry warnings and recalled batches:
+![Alphabetical batch index](docs/screenshots/lotes.png)
 
-![An organization's batches](docs/screenshots/lotes.png)
+The record of a batch that went through the whole chain, with its transaction history:
+
+![Record of a dispensed batch](docs/screenshots/lote.png)
 
 Cargoes (batches move together) and the cold chain with the case's verdict:
 
@@ -94,8 +96,9 @@ src/
 ├── errorMessages.js    Translates chaincode and backend errors
 ├── apiKey.js           Runtime API key (sessionStorage)
 ├── domain.js           Organizations, states, possible actions and formatting
-├── hooks/useAction.js  { loading, error, data } for each call
-├── components/         Layout, CustodyStepper, BatchActions, TermsPanel, BatchHistory, ...
+├── theme.js            Palette and typefaces (Source Serif 4 + IBM Plex, bundled, no external requests)
+├── hooks/              useAction ({ loading, error, data }) and useCatalog (every batch on the network)
+├── components/         Layout, GlobalSearch, RecordHeader, Section, CustodyStepper, BatchActions, ...
 └── pages/              Dashboard, Batches, Register, Cargo, ColdChain
 ```
 
@@ -105,9 +108,16 @@ The interface itself is in Spanish.
 
 `npm run dev` · `npm run build` · `npm run preview` · `npm run lint`
 
+## Versions
+
+- **v2** (this one): formulary-style redesign (a *vademécum*, the drug reference book). Alphabetical
+  index, batch record laid out as a monograph, global search and an overview with recalls and
+  expiries. Same API as v1.
+- **v1**: first version on the Fabric REST API (commit `a57a287`).
+
 ## Testing status
 
-The UI was tested end to end with Playwright (29 flows: full batch lifecycle, recall, cargoes, private
-terms, cold chain, translated errors, API down, mobile) against the real Express backend with a
+The UI was tested end to end with Playwright (28 flows: index and search, full batch lifecycle, recall,
+cargoes, private terms, cold chain, translated errors, API down, mobile) against the real Express backend with a
 simulated ledger. It was **not** tested against a real Fabric network or the Go chaincode:
 endorsement policies and MSP identities remain uncovered until the network is available.

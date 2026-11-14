@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import {
-    Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Link, Stack, TextField, Typography,
+    Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, CircularProgress, Link, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -12,6 +12,8 @@ import { EVENT_LABEL, formatDateTime, formatDuration, formatTemp, parseTempToCen
 import PageHeader from "../components/PageHeader.jsx";
 import ErrorAlert from "../components/ErrorAlert.jsx";
 import StateChip from "../components/StateChip.jsx";
+import RecordHeader from "../components/RecordHeader.jsx";
+import Section from "../components/Section.jsx";
 import SubmitButton from "../components/SubmitButton.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
@@ -33,54 +35,76 @@ function ProofLookup({ cargoId, anchored }) {
     const [lookup, { loading, error, data }] = useAction(api.getReadingProof);
     const seqOk = /^\d+$/.test(seq);
     return (
-        <Card>
-            <CardContent>
-                <Typography variant="h6">Prueba de una lectura</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Cada lectura firmada por la valija se ancla en la cadena dentro de un árbol de Merkle. Con su número se pide la prueba y se verifica contra lo anclado.
-                    {anchored ? ` Hay ${anchored} lecturas ancladas.` : ""}
-                </Typography>
-                <Stack
-                    component="form"
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1.5}
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        lookup({ cargoId, seq: Number(seq), verify: true });
-                    }}
-                >
-                    <TextField label="Número de lectura (seq)" value={seq} onChange={(e) => setSeq(e.target.value)} inputMode="numeric" error={seq !== "" && !seqOk} />
-                    <Box>
-                        <SubmitButton loading={loading} disabled={!seqOk} sx={{ minWidth: 140, height: 56 }}>
-                            Verificar
-                        </SubmitButton>
-                    </Box>
-                </Stack>
-                <ErrorAlert error={error} sx={{ mt: 2 }} />
-                {data && (
-                    <Stack spacing={1.5} sx={{ mt: 2 }}>
-                        <Alert severity={data.verifiedOnLedger ? "success" : "error"}>
-                            {data.verifiedOnLedger
-                                ? `La lectura ${data.seq} está anclada en la cadena (ancla ${data.anchorIndex}) y su prueba es válida.`
-                                : `La prueba de la lectura ${data.seq} NO coincide con lo anclado.`}
-                        </Alert>
-                        {data.reading && (
-                            <Typography variant="body2">
-                                {formatDateTime(new Date(data.reading.ts * 1000).toISOString())} · {formatTemp(data.reading.tempCenti / 100)} · {data.reading.humCenti / 100} % humedad
-                                {data.reading.flags & 0x04 ? " · precinto roto" : ""}
-                                {data.reading.flags & 0x01 ? " · tapa abierta" : ""}
-                                {data.reading.flags & 0x02 ? " · golpe" : ""}
-                            </Typography>
-                        )}
-                        <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-all" }}>
-                            Raíz: <code>{data.root}</code>
-                            <br />
-                            Hoja: <code>{data.leaf}</code> · {data.proof?.length ?? 0} pasos de prueba
+        <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: "70ch" }}>
+                Cada lectura firmada por la valija queda anclada en la cadena dentro de un árbol de Merkle. Con su número se pide la prueba y se verifica contra lo anclado.
+                {anchored ? ` Hay ${anchored} lecturas ancladas.` : ""}
+            </Typography>
+            <Stack
+                component="form"
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    lookup({ cargoId, seq: Number(seq), verify: true });
+                }}
+            >
+                <TextField label="Número de lectura (seq)" value={seq} onChange={(e) => setSeq(e.target.value)} inputMode="numeric" error={seq !== "" && !seqOk} sx={{ maxWidth: { sm: 280 } }} />
+                <Box>
+                    <SubmitButton loading={loading} disabled={!seqOk} sx={{ minWidth: 140, height: 56 }}>
+                        Verificar
+                    </SubmitButton>
+                </Box>
+            </Stack>
+            <ErrorAlert error={error} sx={{ mt: 2 }} />
+            {data && (
+                <Stack spacing={1.5} sx={{ mt: 2 }}>
+                    <Alert severity={data.verifiedOnLedger ? "success" : "error"}>
+                        {data.verifiedOnLedger
+                            ? `La lectura ${data.seq} está anclada en la cadena (ancla ${data.anchorIndex}) y su prueba es válida.`
+                            : `La prueba de la lectura ${data.seq} NO coincide con lo anclado.`}
+                    </Alert>
+                    {data.reading && (
+                        <Typography variant="body2">
+                            {formatDateTime(new Date(data.reading.ts * 1000).toISOString())}, {formatTemp(data.reading.tempCenti / 100)}, {data.reading.humCenti / 100} % de humedad
+                            {data.reading.flags & 0x04 ? ", precinto roto" : ""}
+                            {data.reading.flags & 0x01 ? ", tapa abierta" : ""}
+                            {data.reading.flags & 0x02 ? ", golpe" : ""}
                         </Typography>
-                    </Stack>
-                )}
-            </CardContent>
-        </Card>
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-all" }}>
+                        Raíz: <code>{data.root}</code>
+                        <br />
+                        Hoja: <code>{data.leaf}</code> ({data.proof?.length ?? 0} pasos de prueba)
+                    </Typography>
+                </Stack>
+            )}
+        </>
+    );
+}
+
+// Termómetro horizontal: la banda verde es el rango de la política y la marca, la última lectura.
+function TempGauge({ value, min, max }) {
+    const span = max - min;
+    const lo = min - span * 0.75;
+    const hi = max + span * 0.75;
+    const pct = (v) => `${Math.min(100, Math.max(0, ((v - lo) / (hi - lo)) * 100))}%`;
+    const inRange = value >= min && value <= max;
+    return (
+        <Box role="img" aria-label={`Última lectura ${formatTemp(value)}; rango permitido de ${formatTemp(min)} a ${formatTemp(max)}`} sx={{ maxWidth: 520 }}>
+            <Box sx={{ position: "relative", height: 14, borderRadius: 7, bgcolor: "action.hover", border: 1, borderColor: "divider" }}>
+                <Box sx={{ position: "absolute", top: 0, bottom: 0, left: pct(min), right: `calc(100% - ${pct(max)})`, bgcolor: "success.main", opacity: 0.35 }} />
+                <Box sx={{ position: "absolute", top: -5, bottom: -5, left: pct(value), width: 4, ml: "-2px", borderRadius: 2, bgcolor: inRange ? "success.main" : "error.main" }} />
+            </Box>
+            <Box sx={{ position: "relative", height: 20, mt: 0.5 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ position: "absolute", left: pct(min), transform: "translateX(-50%)", whiteSpace: "nowrap" }}>
+                    {formatTemp(min)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ position: "absolute", left: pct(max), transform: "translateX(-50%)", whiteSpace: "nowrap" }}>
+                    {formatTemp(max)}
+                </Typography>
+            </Box>
+        </Box>
     );
 }
 
@@ -110,49 +134,45 @@ function Status({ cargoId }) {
             refresh();
         }
     };
+    const tone = { MONITORING: "transit", COMPLIANT: "green", COMPROMISED: "red" }[s.verdict];
+    const lastInRange = last && s.policy ? last.tempC >= s.policy.minTempC && last.tempC <= s.policy.maxTempC : true;
 
     return (
-        <Stack spacing={3}>
-            {/* Fuera de la tarjeta de acciones: al cerrar el monitoreo esa tarjeta desaparece. */}
+        <>
+            {/* Fuera de la sección de acciones: al cerrar el monitoreo esa sección desaparece. */}
             {notice && (
-                <Alert severity="success" onClose={() => setNotice("")}>
+                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice("")}>
                     {notice}
                 </Alert>
             )}
-            <Card>
-                <CardContent>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, mb: 2 }}>
-                        <Typography variant="h5" component="h2" sx={{ mr: 1 }}>
-                            Cargamento {s.cargoId}
-                        </Typography>
+            <RecordHeader
+                title={`Cadena de frío de ${s.cargoId}`}
+                tone={tone}
+                chips={
+                    <>
                         <StateChip kind="verdict" state={s.verdict} />
                         {s.closed && <Chip size="small" variant="outlined" label="Monitoreo cerrado" />}
-                    </Stack>
-                    {s.verdict === "COMPROMISED" && s.reason && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                            Cadena de frío comprometida: {translateReason(s.reason)}
-                        </Alert>
-                    )}
-                    {s.verdict === "COMPLIANT" && (
-                        <Alert severity="success" sx={{ mb: 2 }}>
-                            El cargamento cumplió la política durante todo el recorrido.
-                        </Alert>
-                    )}
-                    <Grid container spacing={2}>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Stat label="Valija">{s.deviceId}</Stat>
-                        </Grid>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Stat label="Política">{s.policy?.id}</Stat>
-                        </Grid>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Stat label="Rango permitido">{s.policy ? `${formatTemp(s.policy.minTempC)} a ${formatTemp(s.policy.maxTempC)}` : null}</Stat>
-                        </Grid>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Stat label="Fuera de rango tolerado">{s.policy ? formatDuration(s.policy.maxExcursionSeconds) : null}</Stat>
-                        </Grid>
+                    </>
+                }
+                facts={[
+                    { label: "Valija", value: s.deviceId },
+                    { label: "Política", value: s.policy?.id },
+                    { label: "Rango permitido", value: s.policy ? `${formatTemp(s.policy.minTempC)} a ${formatTemp(s.policy.maxTempC)}` : null },
+                    { label: "Inicio", value: formatDateTime(s.startedAt) },
+                ]}
+            />
+
+            <Paper variant="outlined" sx={{ mt: 2, px: { xs: 2, sm: 3 } }}>
+                <Section first title="Veredicto">
+                    {s.verdict === "COMPROMISED" && <Alert severity="error">Cadena de frío comprometida: {translateReason(s.reason) || "sin detalle"}</Alert>}
+                    {s.verdict === "COMPLIANT" && <Alert severity="success">El cargamento cumplió la política durante todo el recorrido.</Alert>}
+                    {s.verdict === "MONITORING" && <Alert severity="info">En monitoreo: hasta ahora cumple la política. El veredicto queda firme al cerrar.</Alert>}
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
                         <Grid size={{ xs: 6, md: 3 }}>
                             <Stat label="Tiempo fuera de rango">{formatDuration(s.excursionSeconds)}</Stat>
+                        </Grid>
+                        <Grid size={{ xs: 6, md: 3 }}>
+                            <Stat label="Tolerado por la política">{s.policy ? formatDuration(s.policy.maxExcursionSeconds) : null}</Stat>
                         </Grid>
                         <Grid size={{ xs: 6, md: 3 }}>
                             <Stat label="Lecturas ancladas">{s.anchoredReadings}</Stat>
@@ -160,72 +180,48 @@ function Status({ cargoId }) {
                         <Grid size={{ xs: 6, md: 3 }}>
                             <Stat label="Pendientes de anclar">{s.pendingReadings}</Stat>
                         </Grid>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Stat label="Inicio">{formatDateTime(s.startedAt)}</Stat>
-                        </Grid>
                     </Grid>
                     <Box sx={{ mt: 2 }}>
                         <Link component={RouterLink} to={`/cargo/${encodeURIComponent(s.cargoId)}`} underline="hover">
-                            Ver el cargamento →
+                            Ver el cargamento {s.cargoId}
                         </Link>
                     </Box>
-                </CardContent>
-            </Card>
+                </Section>
 
-            {last && (
-                <Card>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 1.5 }}>
-                            Última lectura
+                {last && (
+                    <Section title="Última lectura" hint={`Lectura número ${last.seq}, tomada el ${formatDateTime(last.timestamp)}`}>
+                        <Typography sx={{ fontFamily: (t) => t.typography.h4.fontFamily, fontSize: "2.5rem", fontWeight: 600, lineHeight: 1, mb: 1.5, color: lastInRange ? "text.primary" : "error.main", fontVariantNumeric: "tabular-nums" }}>
+                            {formatTemp(last.tempC)}
                         </Typography>
-                        <Grid container spacing={2}>
-                            <Grid size={{ xs: 6, md: 3 }}>
-                                <Stat label="Temperatura">{formatTemp(last.tempC)}</Stat>
-                            </Grid>
-                            <Grid size={{ xs: 6, md: 3 }}>
-                                <Stat label="Humedad">{last.humidityPct !== undefined ? `${last.humidityPct} %` : null}</Stat>
-                            </Grid>
-                            <Grid size={{ xs: 6, md: 3 }}>
-                                <Stat label="Momento">{formatDateTime(last.timestamp)}</Stat>
-                            </Grid>
-                            <Grid size={{ xs: 6, md: 3 }}>
-                                <Stat label="Número (seq)">{last.seq}</Stat>
-                            </Grid>
-                            <Grid size={{ xs: 12 }}>
-                                <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
-                                    <Chip size="small" color={last.sealBroken ? "error" : "success"} variant="outlined" label={last.sealBroken ? "Precinto roto" : "Precinto íntegro"} />
-                                    <Chip size="small" color={last.lidOpened ? "warning" : "default"} variant="outlined" label={last.lidOpened ? "Tapa abierta" : "Tapa cerrada"} />
-                                    <Chip size="small" color={last.shock ? "warning" : "default"} variant="outlined" label={last.shock ? "Golpe detectado" : "Sin golpes"} />
-                                </Stack>
-                            </Grid>
-                        </Grid>
-                    </CardContent>
-                </Card>
-            )}
+                        {s.policy && <TempGauge value={last.tempC} min={s.policy.minTempC} max={s.policy.maxTempC} />}
+                        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mt: 1.5 }}>
+                            {last.humidityPct !== undefined && <Chip size="small" variant="outlined" label={`Humedad ${last.humidityPct} %`} />}
+                            <Chip size="small" color={last.sealBroken ? "error" : "success"} variant="outlined" label={last.sealBroken ? "Precinto roto" : "Precinto íntegro"} />
+                            <Chip size="small" color={last.lidOpened ? "warning" : "default"} variant="outlined" label={last.lidOpened ? "Tapa abierta" : "Tapa cerrada"} />
+                            <Chip size="small" color={last.shock ? "warning" : "default"} variant="outlined" label={last.shock ? "Golpe detectado" : "Sin golpes"} />
+                        </Stack>
+                    </Section>
+                )}
 
-            {s.events?.length > 0 && (
-                <Card>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 1 }}>
-                            Eventos
-                        </Typography>
-                        <Stack spacing={0.75} component="ul" sx={{ m: 0, pl: 2.5 }}>
+                {s.events?.length > 0 && (
+                    <Section title="Eventos" hint="Avisos de la valija que quedaron registrados en la cadena.">
+                        <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
                             {s.events.map((ev, i) => (
-                                <Typography component="li" key={i} variant="body2">
-                                    {EVENT_LABEL[ev.kind] ?? ev.kind} — {formatDateTime(new Date(ev.timestamp * 1000).toISOString())}
+                                <Typography component="li" key={i} sx={{ py: 0.75, borderTop: i ? 1 : 0, borderColor: "divider" }}>
+                                    <Box component="span" sx={{ fontWeight: 600 }}>
+                                        {EVENT_LABEL[ev.kind] ?? ev.kind}
+                                    </Box>{" "}
+                                    <Box component="span" sx={{ color: "text.secondary" }}>
+                                        {formatDateTime(new Date(ev.timestamp * 1000).toISOString())}
+                                    </Box>
                                 </Typography>
                             ))}
-                        </Stack>
-                    </CardContent>
-                </Card>
-            )}
+                        </Box>
+                    </Section>
+                )}
 
-            {!s.closed && (
-                <Card>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 1.5 }}>
-                            Acciones
-                        </Typography>
+                {!s.closed && (
+                    <Section title="Acciones">
                         <ErrorAlert error={anchorState.error || closeState.error} sx={{ mb: 2 }} />
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                             <Button variant="outlined" disabled={busy || !s.pendingReadings} onClick={() => act(anchor({ cargoId: s.cargoId }), "Lecturas ancladas en la cadena.")}>
@@ -235,11 +231,13 @@ function Status({ cargoId }) {
                                 Cerrar monitoreo
                             </Button>
                         </Stack>
-                    </CardContent>
-                </Card>
-            )}
+                    </Section>
+                )}
 
-            <ProofLookup cargoId={s.cargoId} anchored={s.anchoredReadings} />
+                <Section title="Prueba de una lectura">
+                    <ProofLookup cargoId={s.cargoId} anchored={s.anchoredReadings} />
+                </Section>
+            </Paper>
 
             <ConfirmDialog
                 open={confirmClose}
@@ -252,7 +250,7 @@ function Status({ cargoId }) {
                     act(close({ cargoId: s.cargoId }), "Monitoreo cerrado: el veredicto es definitivo.");
                 }}
             />
-        </Stack>
+        </>
     );
 }
 
