@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Stack, TextField, Typography } from "@mui/material";
 import SendIcon from "@mui/icons-material/SendOutlined";
 import MoveToInboxIcon from "@mui/icons-material/MoveToInboxOutlined";
 import MedicationIcon from "@mui/icons-material/MedicationOutlined";
@@ -40,11 +40,7 @@ export default function BatchActions({ batch, onChanged }) {
     const nothing = !can.canDispatch && !can.canReceive && !can.canDispense && !can.canRecall;
 
     return (
-        <Card>
-            <CardContent>
-                <Typography variant="h6" sx={{ mb: 1.5 }}>
-                    Acciones
-                </Typography>
+        <Box>
                 {notice && (
                     <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice("")}>
                         {notice}
@@ -135,7 +131,6 @@ export default function BatchActions({ batch, onChanged }) {
                         </Stack>
                     )}
                 </Stack>
-            </CardContent>
 
             <ConfirmDialog
                 open={confirmRecall}
@@ -149,6 +144,6 @@ export default function BatchActions({ batch, onChanged }) {
                     done(recall({ batchId: batch.id, reason: reason.trim() }), "Lote retirado del mercado.").then(() => setReason(""));
                 }}
             />
-        </Card>
+        </Box>
     );
 }

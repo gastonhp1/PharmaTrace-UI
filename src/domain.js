@@ -144,3 +144,30 @@ export const shortHash = (hash, n = 8) => (hash && hash.length > n * 2 ? `${hash
 export const GTIN_RE = /^\d{8,14}$/;
 export const PRICE_RE = /^\d+(\.\d{1,4})?$/;
 export const CURRENCY_RE = /^[A-Z]{3}$/;
+
+// "2027-09-30" -> "09/2027", como va impreso en el envase.
+export function formatExpiryShort(iso) {
+    const m = /^(\d{4})-(\d{2})/.exec(iso || "");
+    return m ? `${m[2]}/${m[1]}` : iso || "—";
+}
+
+// Letra bajo la que se ordena un producto en el índice ("Ácido…" va en la A).
+export function indexLetter(product) {
+    const ch = String(product || "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").charAt(0).toUpperCase();
+    return /[A-Z]/.test(ch) ? ch : "#";
+}
+
+// Dónde está físicamente un lote, en palabras.
+export function whereIs(batch) {
+    if (batch.state === "DISPENSED") return "Dispensado al paciente";
+    if (batch.pendingTo) return `En tránsito a ${orgLabel(batch.pendingTo)}`;
+    return `En ${orgLabel(batch.owner)}`;
+}
+
+// Coincidencia de texto sin distinguir mayúsculas ni acentos.
+const fold = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+export function matchesBatch(batch, query) {
+    const q = fold(query).trim();
+    if (!q) return true;
+    return [batch.product, batch.id, batch.lot, batch.gtin].some((v) => fold(v).includes(q));
+}

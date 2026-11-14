@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Link, Stack, TextField, Typography } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import { Link as RouterLink, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Link, Paper, Stack, TextField, Typography } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import SendIcon from "@mui/icons-material/SendOutlined";
 import MoveToInboxIcon from "@mui/icons-material/MoveToInboxOutlined";
 import * as api from "../api.js";
 import { useAction } from "../hooks/useAction.js";
-import { NEXT_ORG, formatDateTime, orgLabel } from "../domain.js";
+import { NEXT_ORG, formatDateTime, formatExpiryShort, orgLabel } from "../domain.js";
 import PageHeader from "../components/PageHeader.jsx";
 import ErrorAlert from "../components/ErrorAlert.jsx";
 import StateChip from "../components/StateChip.jsx";
+import RecordHeader from "../components/RecordHeader.jsx";
+import Section from "../components/Section.jsx";
 import SubmitButton from "../components/SubmitButton.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
@@ -67,6 +68,9 @@ function CreateCargo({ onCreated }) {
 }
 
 function CargoDetail({ cargoId }) {
+    const { catalog } = useOutletContext();
+    const reloadCatalog = catalog.reload;
+    const byId = new Map((catalog.batches ?? []).map((b) => [b.id, b]));
     const [load, { loading, error, data: cargo }, reset] = useAction(api.getCargo);
     const [dispatch, dispatchState] = useAction(api.dispatchCargo);
     const [receive, receiveState] = useAction(api.receiveCargo);
@@ -92,58 +96,50 @@ function CargoDetail({ cargoId }) {
         if (await promise) {
             setNotice(message);
             refresh();
+            reloadCatalog();
         }
     };
 
-    return (
-        <Stack spacing={3}>
-            <Card>
-                <CardContent>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, mb: 2 }}>
-                        <Typography variant="h5" component="h2" sx={{ mr: 1 }}>
-                            Cargamento {cargo.id}
-                        </Typography>
-                        <StateChip kind="cargo" state={cargo.state} />
-                    </Stack>
-                    <Grid container spacing={2}>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Typography variant="caption" color="text.secondary">Dueño</Typography>
-                            <Typography>{orgLabel(cargo.owner)}</Typography>
-                        </Grid>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Typography variant="caption" color="text.secondary">Destino</Typography>
-                            <Typography>{cargo.pendingTo ? orgLabel(cargo.pendingTo) : "—"}</Typography>
-                        </Grid>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Typography variant="caption" color="text.secondary">Creado</Typography>
-                            <Typography>{formatDateTime(cargo.createdAt)}</Typography>
-                        </Grid>
-                        <Grid size={{ xs: 6, md: 3 }}>
-                            <Typography variant="caption" color="text.secondary">Actualizado</Typography>
-                            <Typography>{formatDateTime(cargo.updatedAt)}</Typography>
-                        </Grid>
-                    </Grid>
-                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                        Lotes ({cargo.batchIds?.length ?? 0})
-                    </Typography>
-                    <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
-                        {(cargo.batchIds ?? []).map((id) => (
-                            <Chip key={id} component={RouterLink} to={`/batches/${encodeURIComponent(id)}`} clickable label={id} />
-                        ))}
-                    </Stack>
-                    <Box sx={{ mt: 2 }}>
-                        <Link component={RouterLink} to={`/coldchain/${encodeURIComponent(cargo.id)}`} underline="hover">
-                            Ver cadena de frío de este cargamento →
-                        </Link>
-                    </Box>
-                </CardContent>
-            </Card>
+    const tone = { OPEN: "neutral", IN_TRANSIT: "transit", DELIVERED: "green", DISSOLVED: "neutral" }[cargo.state];
+    const finished = cargo.state === "DELIVERED" || cargo.state === "DISSOLVED";
 
-            <Card>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 1.5 }}>
-                        Acciones
-                    </Typography>
+    return (
+        <>
+            <RecordHeader
+                title={`Cargamento ${cargo.id}`}
+                tone={tone}
+                chips={<StateChip kind="cargo" state={cargo.state} />}
+                facts={[
+                    { label: "En custodia de", value: orgLabel(cargo.owner) },
+                    { label: "Destino", value: cargo.pendingTo ? orgLabel(cargo.pendingTo) : "Sin despachar" },
+                    { label: "Armado", value: formatDateTime(cargo.createdAt) },
+                    { label: "Última actualización", value: formatDateTime(cargo.updatedAt) },
+                ]}
+            />
+            <Paper variant="outlined" sx={{ mt: 2, px: { xs: 2, sm: 3 } }}>
+                <Section first title="Contenido" hint="Los lotes de un cargamento se despachan y se reciben juntos.">
+                    <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                        {(cargo.batchIds ?? []).map((id) => {
+                            const b = byId.get(id);
+                            return (
+                                <Box component="li" key={id} sx={{ py: 1, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0, pt: 0 } }}>
+                                    <Link component={RouterLink} to={`/batches/${encodeURIComponent(id)}`} underline="hover" sx={{ fontWeight: 600 }}>
+                                        {b?.product ?? id}
+                                    </Link>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {b ? `${id}, lote ${b.lot}, vto. ${formatExpiryShort(b.expiryDate)}` : id}
+                                    </Typography>
+                                </Box>
+                            );
+                        })}
+                    </Box>
+                </Section>
+                <Section title="Cadena de frío" hint="Si el cargamento viaja con una valija IoT, acá está su veredicto.">
+                    <Button component={RouterLink} to={`/coldchain/${encodeURIComponent(cargo.id)}`} variant="outlined">
+                        Ver la cadena de frío de {cargo.id}
+                    </Button>
+                </Section>
+                <Section title="Acciones">
                     {notice && (
                         <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice("")}>
                             {notice}
@@ -177,11 +173,9 @@ function CargoDetail({ cargoId }) {
                             </Button>
                         )}
                     </Stack>
-                    {(cargo.state === "DELIVERED" || cargo.state === "DISSOLVED") && (
-                        <Typography color="text.secondary">Este cargamento ya terminó: no admite más acciones.</Typography>
-                    )}
-                </CardContent>
-            </Card>
+                    {finished && <Typography color="text.secondary">Este cargamento ya terminó: no admite más acciones.</Typography>}
+                </Section>
+            </Paper>
 
             <ConfirmDialog
                 open={confirmDissolve}
@@ -194,7 +188,7 @@ function CargoDetail({ cargoId }) {
                     run(dissolve({ cargoId: cargo.id }), "Cargamento disuelto. Los lotes quedaron sueltos.");
                 }}
             />
-        </Stack>
+        </>
     );
 }
 

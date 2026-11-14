@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Box, Button, Card, CardContent, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import * as api from "../api.js";
 import { useAction } from "../hooks/useAction.js";
 import { CURRENCY_RE, LEG_BY_OWNER, LEG_LABEL, NEXT_ORG, PRICE_RE, orgLabel } from "../domain.js";
@@ -34,12 +34,7 @@ export default function TermsPanel({ batch }) {
     const readLegBuyer = readLeg === "manufacturer" ? "DistMSP" : "FarmaMSP";
 
     return (
-        <Card>
-            <CardContent>
-                <Typography variant="h6">Condiciones comerciales</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Precio, moneda y cantidad de cada venta. Son privadas entre vendedor y comprador; en la cadena pública queda solo su hash.
-                </Typography>
+        <Box>
 
                 {canSet ? (
                     <Stack
@@ -121,7 +116,6 @@ export default function TermsPanel({ batch }) {
                         </Alert>
                     )}
                 </Stack>
-            </CardContent>
-        </Card>
+        </Box>
     );
 }

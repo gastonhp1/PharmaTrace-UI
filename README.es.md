@@ -7,25 +7,27 @@ Interfaz web de [PharmaTrace](https://github.com/gastonhp1/PharmaTrace) sobre **
 no se conecta a la red Fabric ni maneja identidades: el backend es custodial y firma cada operación
 con la identidad de la organización que corresponde (el dueño del lote, quien lo recibe, el regulador).
 
-![Inicio: organizaciones del consorcio y accesos](docs/screenshots/inicio.png)
+![Panorama de la red: custodia por organización, retiros y lotes por vencer](docs/screenshots/inicio.png)
 
 ## Qué se puede hacer
 
 | Pantalla | Ruta | Qué hace |
 | --- | --- | --- |
-| Inicio | `/` | Organizaciones del consorcio, su rol y cuántos lotes tiene cada una |
-| Lotes | `/batches/:batchId?` | Buscar un lote o listar los de una organización; despachar, recibir, dispensar, retirar; condiciones comerciales; historial en la cadena |
+| Panorama | `/` | Cuántos lotes tiene cada eslabón de la cadena, retiros del mercado y lotes próximos a vencer |
+| Vademécum de lotes | `/batches/:batchId?` | Índice alfabético de todos los lotes con filtros por texto y por estado. Cada lote abre su ficha: rótulo, recorrido, acciones (despachar, recibir, dispensar, retirar), condiciones comerciales e historial |
 | Registrar lote | `/register` | Alta de un lote por el laboratorio (GTIN de 8 a 14 dígitos, vencimiento) |
 | Cargamentos | `/cargo/:cargoId?` | Armar un cargamento con varios lotes, despacharlo, recibirlo o disolverlo |
 | Cadena de frío | `/coldchain/:cargoId?` | Veredicto de la valija IoT, última lectura, eventos y prueba de Merkle de cada lectura; configuración del operador |
 
-Trazabilidad de un lote que recorrió la cadena completa, con el historial de transacciones:
+El buscador de la barra superior encuentra lotes por producto, número de lote, GTIN o ID desde cualquier pantalla.
 
-![Un lote dispensado y su historial](docs/screenshots/lote.png)
+El vademécum: todos los lotes de la red, ordenados por producto:
 
-Lotes en poder de una organización, con alerta de vencimiento y lotes retirados:
+![Índice alfabético de lotes](docs/screenshots/lotes.png)
 
-![Lotes de una organización](docs/screenshots/lotes.png)
+La ficha de un lote que recorrió la cadena completa, con su historial de transacciones:
+
+![Ficha de un lote dispensado](docs/screenshots/lote.png)
 
 Cargamentos (los lotes se mueven juntos) y cadena de frío con el veredicto de la valija:
 
@@ -93,8 +95,9 @@ src/
 ├── errorMessages.js    Traduce los errores del chaincode y del backend
 ├── apiKey.js           Clave de API en runtime (sessionStorage)
 ├── domain.js           Organizaciones, estados, acciones posibles y formatos
-├── hooks/useAction.js  { loading, error, data } para cada llamada
-├── components/         Layout, CustodyStepper, BatchActions, TermsPanel, BatchHistory, ...
+├── theme.js            Paleta y tipografías (Source Serif 4 + IBM Plex, servidas desde el bundle)
+├── hooks/              useAction ({ loading, error, data }) y useCatalog (todos los lotes de la red)
+├── components/         Layout, GlobalSearch, RecordHeader, Section, CustodyStepper, BatchActions, ...
 └── pages/              Dashboard, Batches, Register, Cargo, ColdChain
 ```
 
@@ -102,9 +105,15 @@ src/
 
 `npm run dev` · `npm run build` · `npm run preview` · `npm run lint`
 
+## Versiones
+
+- **v2** (esta): rediseño tipo vademécum. Índice alfabético, ficha de lote como monografía, buscador
+  global y panorama con retiros y vencimientos. Misma API que v1.
+- **v1**: primera versión sobre la API REST de Fabric (commit `a57a287`).
+
 ## Estado de las pruebas
 
-El UI se probó de punta a punta con Playwright (29 flujos: ciclo completo de un lote, retiro,
-cargamentos, condiciones privadas, cadena de frío, errores traducidos, API caída, móvil) contra el
+El UI se probó de punta a punta con Playwright (28 flujos: índice y buscador, ciclo completo de un
+lote, retiro, cargamentos, condiciones privadas, cadena de frío, errores traducidos, API caída, móvil) contra el
 backend Express real con un ledger simulado. **No** se probó contra una red Fabric real ni contra el
 chaincode Go: las políticas de endorsement y las identidades MSP quedan sin cubrir hasta tener la red.
