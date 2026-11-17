@@ -18,6 +18,7 @@ con la identidad de la organización que corresponde (el dueño del lote, quien 
 | Registrar lote | `/register` | Alta de un lote por el laboratorio (GTIN de 8 a 14 dígitos, vencimiento) |
 | Cargamentos | `/cargo/:cargoId?` | Armar un cargamento con varios lotes, despacharlo, recibirlo o disolverlo |
 | Cadena de frío | `/coldchain/:cargoId?` | Veredicto de la valija IoT, última lectura, eventos y prueba de Merkle de cada lectura; configuración del operador |
+| Avisos | `/notifications` | Lo que cada org tiene que atender: retiros, cadena de frío rota, lotes en cuarentena, envíos en camino |
 
 El buscador de la barra superior encuentra lotes por producto, número de lote, GTIN o ID desde cualquier pantalla.
 
@@ -83,6 +84,8 @@ Las aplica el chaincode; el UI solo muestra lo que tiene sentido y traduce los e
 - **Condiciones comerciales** (precio, moneda, cantidad): viven en colecciones privadas. Solo las ven
   el vendedor y el comprador de cada tramo; cualquiera puede verificar si unos valores coinciden con
   el hash público sin ver los reales.
+- **Cuarentena:** los lotes que llegan en un cargamento con la cadena de frío rota quedan `QUARANTINED`; la
+  ficha del lote muestra el motivo y le permite al regulador liberarlos o retirarlos.
 - **Cadena de frío:** la valija firma cada lectura (P-256); las lecturas se anclan en bloques con una
   raíz de Merkle. El veredicto pasa de *Monitoreando* a *Cumple* o *Comprometida* (precinto roto o
   más tiempo fuera de rango que el que tolera la política) y, al cerrar el monitoreo, es definitivo.

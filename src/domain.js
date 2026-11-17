@@ -36,6 +36,8 @@ export const BATCH_STATES = {
     IN_PHARMACY: { label: "En farmacia", color: "secondary" },
     DISPENSED: { label: "Dispensado", color: "success" },
     RECALLED: { label: "Retirado", color: "error" },
+    // Salió de un cargamento con la cadena de frío rota: no se mueve hasta que el regulador decida.
+    QUARANTINED: { label: "En cuarentena", color: "warning" },
 };
 
 export const CARGO_STATES = {
@@ -71,14 +73,17 @@ export function custodyPosition(batch) {
 // Lo que se puede hacer con un lote hoy. Es solo ayuda de UI: la regla real la aplica el chaincode.
 export function batchActions(batch) {
     const done = batch.state === "DISPENSED" || batch.state === "RECALLED";
+    const quarantined = batch.state === "QUARANTINED";
     const inCargo = Boolean(batch.cargo);
     return {
         inCargo,
-        canDispatch: !done && !inCargo && !batch.pendingTo && Boolean(NEXT_ORG[batch.owner]),
+        quarantined,
+        canDispatch: !done && !quarantined && !inCargo && !batch.pendingTo && Boolean(NEXT_ORG[batch.owner]),
         canReceive: !inCargo && Boolean(batch.pendingTo) && batch.state !== "DISPENSED",
         canDispense: batch.state === "IN_PHARMACY" && !batch.pendingTo && !inCargo,
         canRecall: !done,
-        canSetTerms: !done && !batch.pendingTo && Boolean(LEG_BY_OWNER[batch.owner]),
+        canRelease: quarantined,
+        canSetTerms: !done && !quarantined && !batch.pendingTo && Boolean(LEG_BY_OWNER[batch.owner]),
     };
 }
 
@@ -104,6 +109,40 @@ export const formatTemp = (celsius) =>
     celsius === null || celsius === undefined
         ? "—"
         : `${Number(celsius).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} °C`;
+
+// Avisos de GET /api/notifications, armados por el backend a partir de los eventos del chaincode:
+// { id, block, event, severity, orgs[], batchIds[], cargoId?, reason?, from?, message, at }
+export const SEVERITY = {
+    critical: { label: "Crítico", color: "error" },
+    warning: { label: "Atención", color: "warning" },
+    info: { label: "Informativo", color: "info" },
+};
+
+const lotes = (n) => (n === 1 ? "1 lote" : `${n} lotes`);
+
+// El texto del aviso en español. Si el evento no se conoce, queda el mensaje original del backend.
+export function notificationText(n) {
+    const ids = n.batchIds ?? [];
+    const why = n.reason ? `: ${translateReason(n.reason)}` : "";
+    switch (n.event) {
+        case "ColdChainCompromised":
+            return `El cargamento ${n.cargoId} perdió la cadena de frío${why}.`;
+        case "CargoReceived":
+            return `${lotes(ids.length)} del cargamento ${n.cargoId} ${ids.length === 1 ? "llegó" : "llegaron"} en cuarentena${why}.`;
+        case "CargoDissolved":
+            return `${lotes(ids.length)} del cargamento ${n.cargoId} ${ids.length === 1 ? "quedó" : "quedaron"} en cuarentena al disolverlo${why}.`;
+        case "BatchRecalled":
+            return `El lote ${ids[0]} fue retirado del mercado${why}.`;
+        case "BatchReleased":
+            return `El regulador liberó el lote ${ids[0]} de la cuarentena${why}.`;
+        case "CargoDispatched":
+            return `El cargamento ${n.cargoId} (${lotes(ids.length)}) está en camino desde ${orgLabel(n.from)}.`;
+        case "BatchDispatched":
+            return `El lote ${ids[0]} está en camino desde ${orgLabel(n.from)}.`;
+        default:
+            return n.message;
+    }
+}
 
 export const EVENT_LABEL = { LID_OPENED: "Tapa abierta", SHOCK: "Golpe detectado", SEAL_BROKEN: "Precinto roto" };
 

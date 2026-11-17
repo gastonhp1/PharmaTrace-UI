@@ -11,7 +11,7 @@ import ErrorAlert from "./ErrorAlert.jsx";
 export default function TermsPanel({ batch }) {
     const leg = LEG_BY_OWNER[batch.owner];
     const buyer = NEXT_ORG[batch.owner];
-    const canSet = Boolean(leg) && !batch.pendingTo && batch.state !== "DISPENSED" && batch.state !== "RECALLED";
+    const canSet = Boolean(leg) && !batch.pendingTo && batch.state !== "DISPENSED" && batch.state !== "RECALLED" && batch.state !== "QUARANTINED";
 
     const [form, setForm] = useState({ unitPrice: "", currency: "ARS", quantity: "" });
     const [readLeg, setReadLeg] = useState("manufacturer");

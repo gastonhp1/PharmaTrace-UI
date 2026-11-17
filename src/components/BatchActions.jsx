@@ -4,6 +4,7 @@ import SendIcon from "@mui/icons-material/SendOutlined";
 import MoveToInboxIcon from "@mui/icons-material/MoveToInboxOutlined";
 import MedicationIcon from "@mui/icons-material/MedicationOutlined";
 import ReportIcon from "@mui/icons-material/ReportGmailerrorredOutlined";
+import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
 import * as api from "../api.js";
 import { useAction } from "../hooks/useAction.js";
 import { NEXT_ORG, batchActions, orgLabel } from "../domain.js";
@@ -17,6 +18,8 @@ export default function BatchActions({ batch, onChanged }) {
     const can = batchActions(batch);
     const [patientRef, setPatientRef] = useState("");
     const [reason, setReason] = useState("");
+    const [releaseReason, setReleaseReason] = useState("");
+    const [confirmRelease, setConfirmRelease] = useState(false);
     const [confirmRecall, setConfirmRecall] = useState(false);
     const [notice, setNotice] = useState("");
 
@@ -24,9 +27,10 @@ export default function BatchActions({ batch, onChanged }) {
     const [receive, receiveState] = useAction(api.receiveBatch);
     const [dispense, dispenseState] = useAction(api.dispenseBatch);
     const [recall, recallState] = useAction(api.recallBatch);
+    const [release, releaseState] = useAction(api.releaseBatch);
 
-    const error = dispatchState.error || receiveState.error || dispenseState.error || recallState.error;
-    const busy = dispatchState.loading || receiveState.loading || dispenseState.loading || recallState.loading;
+    const error = dispatchState.error || receiveState.error || dispenseState.error || recallState.error || releaseState.error;
+    const busy = dispatchState.loading || receiveState.loading || dispenseState.loading || recallState.loading || releaseState.loading;
     const next = NEXT_ORG[batch.owner];
 
     const done = async (promise, message) => {
@@ -51,6 +55,11 @@ export default function BatchActions({ batch, onChanged }) {
                 {can.inCargo && (
                     <Alert severity="info" sx={{ mb: 2 }}>
                         El lote viaja en el cargamento {batch.cargo}: se despacha y se recibe junto con el cargamento.
+                    </Alert>
+                )}
+                {can.quarantined && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        El lote está en cuarentena por la cadena de frío. Quien lo tiene no puede moverlo: el regulador revisa la evidencia y lo libera o lo retira del mercado.
                     </Alert>
                 )}
                 {nothing && !can.inCargo && <Typography color="text.secondary">Este lote ya no admite acciones.</Typography>}
@@ -112,6 +121,31 @@ export default function BatchActions({ batch, onChanged }) {
                         </Stack>
                     )}
 
+                    {can.canRelease && (
+                        <Stack
+                            component="form"
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.5}
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                setConfirmRelease(true);
+                            }}
+                        >
+                            <TextField
+                                label="Motivo de la liberación (regulador)"
+                                value={releaseReason}
+                                onChange={(e) => setReleaseReason(e.target.value)}
+                                helperText="Por qué el lote sigue siendo apto. Queda en el historial."
+                                required
+                            />
+                            <Box>
+                                <Button type="submit" color="success" variant="outlined" startIcon={<VerifiedIcon />} disabled={!releaseReason.trim() || busy} sx={{ minWidth: 150, height: 56 }}>
+                                    Liberar
+                                </Button>
+                            </Box>
+                        </Stack>
+                    )}
+
                     {can.canRecall && (
                         <Stack
                             component="form"
@@ -132,6 +166,18 @@ export default function BatchActions({ batch, onChanged }) {
                     )}
                 </Stack>
 
+            <ConfirmDialog
+                open={confirmRelease}
+                title={`¿Liberar el lote ${batch.id} de la cuarentena?`}
+                text="Lo firma el regulador: el lote vuelve a circular y puede despacharse y dispensarse."
+                confirmLabel="Liberar lote"
+                color="success"
+                onClose={() => setConfirmRelease(false)}
+                onConfirm={() => {
+                    setConfirmRelease(false);
+                    done(release({ batchId: batch.id, reason: releaseReason.trim() }), "Lote liberado de la cuarentena.").then(() => setReleaseReason(""));
+                }}
+            />
             <ConfirmDialog
                 open={confirmRecall}
                 title={`¿Retirar el lote ${batch.id} del mercado?`}

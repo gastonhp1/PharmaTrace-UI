@@ -3,7 +3,7 @@ import { BATCH_STATES, CARGO_STATES, VERDICTS } from "../domain.js";
 
 const TABLES = { batch: BATCH_STATES, cargo: CARGO_STATES, verdict: VERDICTS };
 // Los estados que piden atención van llenos; el resto, con contorno y un punto de color.
-const FILLED = new Set(["RECALLED", "COMPROMISED"]);
+const FILLED = new Set(["RECALLED", "QUARANTINED", "COMPROMISED"]);
 
 export default function StateChip({ kind = "batch", state, ...props }) {
     const info = TABLES[kind][state];

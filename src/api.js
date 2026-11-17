@@ -89,7 +89,8 @@ export const registerOrg = ({ mspId, role }) => post("/api/orgs", { mspId, role 
 
 // ---- Lotes ------------------------------------------------------------------------------------
 // batch: { id, gtin, product, lot, expiryDate, manufacturer, owner, pendingTo, state, cargo,
-//          patientRef, recallReason, stateBefore, lastUpdatedAt, lastTxId }
+//          patientRef, recallReason, stateBefore, quarantineReason, quarantineCargo, releaseReason,
+//          lastUpdatedAt, lastTxId }
 export const getBatch = (batchId) => request(`/api/batches/${enc(batchId)}`);
 // -> [{ txId, timestamp, isDelete, batch }] del más viejo al más nuevo
 export const getBatchHistory = (batchId) => request(`/api/batches/${enc(batchId)}/history`);
@@ -100,6 +101,17 @@ export const dispatchBatch = ({ batchId, to }) => post(`/api/batches/${enc(batch
 export const receiveBatch = ({ batchId }) => post(`/api/batches/${enc(batchId)}/receive`);
 export const dispenseBatch = ({ batchId, patientRef }) => post(`/api/batches/${enc(batchId)}/dispense`, { patientRef });
 export const recallBatch = ({ batchId, reason }) => post(`/api/batches/${enc(batchId)}/recall`, { reason });
+// El regulador levanta una cuarentena por cadena de frío.
+export const releaseBatch = ({ batchId, reason }) => post(`/api/batches/${enc(batchId)}/release`, { reason });
+
+// ---- Avisos (eventos del chaincode que alguien tiene que atender) -------------------------------
+// -> [{ id, block, event, severity, orgs[], batchIds[], cargoId?, reason?, from?, message, at }], los más nuevos primero
+export const getNotifications = ({ org, severity, limit = 100 } = {}) => {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (org) query.set("org", org);
+    if (severity) query.set("severity", severity);
+    return request(`/api/notifications?${query}`);
+};
 
 // ---- Condiciones comerciales (privadas entre vendedor y comprador) ------------------------------
 export const setTerms = ({ batchId, buyer, unitPrice, currency, quantity }) =>

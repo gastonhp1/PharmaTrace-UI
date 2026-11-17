@@ -1,6 +1,7 @@
-import { Alert, Box, Typography } from "@mui/material";
+import { Alert, Box, Link, Typography } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
-import { CUSTODY_STEPS, custodyPosition, orgLabel } from "../domain.js";
+import { Link as RouterLink } from "react-router-dom";
+import { CUSTODY_STEPS, custodyPosition, orgLabel, translateReason } from "../domain.js";
 
 // Recorrido del lote: Laboratorio -> Droguería -> Farmacia -> Dispensado, como una línea con
 // cuatro estaciones. El tramo en tránsito se dibuja punteado.
@@ -8,7 +9,13 @@ export default function CustodyStepper({ batch }) {
     const { active, pending } = custodyPosition(batch);
     const recalled = batch.state === "RECALLED";
     const dispensed = batch.state === "DISPENSED";
-    const accent = recalled ? "error.main" : "primary.main";
+    const quarantined = batch.state === "QUARANTINED";
+    const accent = recalled ? "error.main" : quarantined ? "warning.main" : "primary.main";
+    const coldChainLink = batch.quarantineCargo && (
+        <Link component={RouterLink} to={`/coldchain/${encodeURIComponent(batch.quarantineCargo)}`} color="inherit">
+            cargamento {batch.quarantineCargo}
+        </Link>
+    );
 
     return (
         <>
@@ -71,6 +78,17 @@ export default function CustodyStepper({ batch }) {
             {recalled && (
                 <Alert severity="error" sx={{ mb: 1 }}>
                     Retirado del mercado{batch.recallReason ? `: ${batch.recallReason}` : ""}. No puede cambiar de estado.
+                </Alert>
+            )}
+            {quarantined && (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                    En cuarentena: viajó en el {coldChainLink} y la cadena de frío se rompió
+                    {batch.quarantineReason ? ` (${translateReason(batch.quarantineReason)})` : ""}. No se puede despachar ni dispensar hasta que el regulador lo libere o lo retire.
+                </Alert>
+            )}
+            {!quarantined && !recalled && batch.releaseReason && (
+                <Alert severity="info" sx={{ mb: 1 }}>
+                    Estuvo en cuarentena por la cadena de frío del {coldChainLink} y el regulador lo liberó: {batch.releaseReason}
                 </Alert>
             )}
         </>

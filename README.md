@@ -19,6 +19,7 @@ regulator).
 | Register batch | `/register` | The manufacturer registers a batch (8–14 digit GTIN, expiry date) |
 | Cargoes | `/cargo/:cargoId?` | Group several batches into a cargo, dispatch, receive or dissolve it |
 | Cold chain | `/coldchain/:cargoId?` | IoT case verdict, last reading, events and a Merkle proof for each reading; operator setup |
+| Notices | `/notifications` | What each org has to act on: recalls, a broken cold chain, batches in quarantine, shipments on their way |
 
 The search box in the top bar finds batches by product, lot number, GTIN or ID from any screen.
 
@@ -84,6 +85,8 @@ The chaincode enforces them; the UI only shows what makes sense and translates t
 - **Commercial terms** (price, currency, quantity): kept in private data collections. Only the seller
   and buyer of each leg can read them; anyone can check whether some values match the public hash
   without seeing the real ones.
+- **Quarantine:** batches that arrive in a cargo with a broken cold chain are `QUARANTINED`; the batch page
+  shows why and lets the regulator release or recall them.
 - **Cold chain:** the case signs each reading (P-256); readings are anchored in windows under a Merkle
   root. The verdict goes from *Monitoring* to *Compliant* or *Compromised* (broken seal, or more time
   out of range than the policy tolerates) and is final once monitoring is closed.
