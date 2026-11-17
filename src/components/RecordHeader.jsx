@@ -1,6 +1,6 @@
 import { Box, Stack, Typography } from "@mui/material";
 
-const TONE = { neutral: "text.disabled", blue: "primary.main", transit: "info.main", green: "success.main", red: "error.main" };
+const TONE = { neutral: "text.disabled", blue: "primary.main", transit: "info.main", green: "success.main", red: "error.main", amber: "warning.main" };
 
 // Rótulo de una ficha: banda de color según el estado, nombre en serif y los datos que van
 // impresos en el envase (lote, vencimiento, GTIN) en una línea de pares etiqueta/valor.

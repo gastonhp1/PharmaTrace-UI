@@ -10,6 +10,7 @@ import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
 import NoteAddIcon from "@mui/icons-material/NoteAddOutlined";
 import LocalShippingIcon from "@mui/icons-material/LocalShippingOutlined";
 import AcUnitIcon from "@mui/icons-material/AcUnit";
+import NotificationsIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import { checkApi, API_URL } from "../api.js";
 import { useHasApiKey } from "../apiKey.js";
 import { useCatalog } from "../hooks/useCatalog.js";
@@ -22,6 +23,7 @@ const NAV = [
     { to: "/register", label: "Registrar lote", icon: NoteAddIcon },
     { to: "/cargo", label: "Cargamentos", icon: LocalShippingIcon },
     { to: "/coldchain", label: "Cadena de frío", icon: AcUnitIcon },
+    { to: "/notifications", label: "Avisos", icon: NotificationsIcon },
 ];
 
 const HEALTH = {

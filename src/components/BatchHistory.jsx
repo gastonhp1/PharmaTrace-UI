@@ -1,5 +1,5 @@
 import { Box, Chip, Stack, Typography } from "@mui/material";
-import { batchStateLabel, formatDateTime, orgLabel, shortHash } from "../domain.js";
+import { batchStateLabel, formatDateTime, orgLabel, shortHash, translateReason } from "../domain.js";
 
 // Qué pasó en cada versión del lote, a partir de la diferencia con la anterior.
 function describe(entry, prev) {
@@ -8,6 +8,11 @@ function describe(entry, prev) {
     if (!prev?.batch) return `Registrado por ${orgLabel(b.manufacturer)}`;
     const p = prev.batch;
     if (b.state === "RECALLED") return `Retirado del mercado${b.recallReason ? `: ${b.recallReason}` : ""}`;
+    if (b.state === "QUARANTINED") {
+        const where = b.owner !== p.owner ? `Recibido por ${orgLabel(b.owner)} en cuarentena` : "Puesto en cuarentena";
+        return `${where}${b.quarantineReason ? `: ${translateReason(b.quarantineReason)}` : ""}`;
+    }
+    if (p.state === "QUARANTINED") return `Liberado de la cuarentena por el regulador${b.releaseReason ? `: ${b.releaseReason}` : ""}`;
     if (b.state === "DISPENSED") return "Dispensado al paciente";
     if (b.pendingTo && b.pendingTo !== p.pendingTo) return `Despachado de ${orgLabel(b.owner)} a ${orgLabel(b.pendingTo)}`;
     if (b.owner !== p.owner) return `Recibido por ${orgLabel(b.owner)}`;

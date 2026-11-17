@@ -3,7 +3,7 @@ import { Link as RouterLink, useOutletContext } from "react-router-dom";
 import { Alert, Box, Button, Link, Paper, Stack, Typography } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import * as api from "../api.js";
-import { daysToExpiry, formatExpiryShort, whereIs } from "../domain.js";
+import { daysToExpiry, formatExpiryShort, translateReason, whereIs } from "../domain.js";
 import PageHeader from "../components/PageHeader.jsx";
 import ErrorAlert from "../components/ErrorAlert.jsx";
 import Section from "../components/Section.jsx";
@@ -92,6 +92,7 @@ export default function Dashboard() {
     const all = batches ?? [];
     const live = all.filter((b) => b.state !== "DISPENSED" && b.state !== "RECALLED");
     const recalled = all.filter((b) => b.state === "RECALLED");
+    const quarantined = all.filter((b) => b.state === "QUARANTINED");
     const expiring = live
         .map((b) => ({ b, days: daysToExpiry(b.expiryDate) }))
         .filter(({ days }) => days !== null && days <= 90)
@@ -100,7 +101,7 @@ export default function Dashboard() {
 
     return (
         <>
-            <PageHeader title="Panorama de la red" subtitle="Dónde está cada lote hoy, qué se retiró del mercado y qué está por vencer." />
+            <PageHeader title="Panorama de la red" subtitle="Dónde está cada lote hoy, qué está en cuarentena, qué se retiró del mercado y qué está por vencer." />
             <ErrorAlert error={error || catalog.error} sx={{ mb: 2 }} />
             {missing.length > 0 && (
                 <Alert severity="warning" sx={{ mb: 2 }}>
@@ -127,7 +128,23 @@ export default function Dashboard() {
             </Typography>
 
             <Paper variant="outlined" sx={{ px: { xs: 2, sm: 3 } }}>
-                <Section first title="Retiros del mercado" hint="Lotes que el regulador sacó de circulación. No vuelven a cambiar de estado.">
+                <Section first title="En cuarentena" hint="Lotes que llegaron con la cadena de frío rota. No se mueven hasta que el regulador los libere o los retire.">
+                    {quarantined.length === 0 ? (
+                        <Typography color="text.secondary">No hay lotes en cuarentena.</Typography>
+                    ) : (
+                        <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                            {quarantined.map((b) => (
+                                <BatchLine
+                                    key={b.id}
+                                    batch={b}
+                                    tone="warning.main"
+                                    detail={`Cargamento ${b.quarantineCargo}: ${translateReason(b.quarantineReason) || "cadena de frío rota"}`}
+                                />
+                            ))}
+                        </Box>
+                    )}
+                </Section>
+                <Section title="Retiros del mercado" hint="Lotes que el regulador sacó de circulación. No vuelven a cambiar de estado.">
                     {recalled.length === 0 ? (
                         <Typography color="text.secondary">No hay lotes retirados.</Typography>
                     ) : (

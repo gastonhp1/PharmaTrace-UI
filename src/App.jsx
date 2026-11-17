@@ -8,6 +8,7 @@ import Batches from "./pages/Batches.jsx";
 import Register from "./pages/Register.jsx";
 import Cargo from "./pages/Cargo.jsx";
 import ColdChain from "./pages/ColdChain.jsx";
+import Notifications from "./pages/Notifications.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
                         <Route path="register" element={<Register />} />
                         <Route path="cargo/:cargoId?" element={<Cargo />} />
                         <Route path="coldchain/:cargoId?" element={<ColdChain />} />
+                        <Route path="notifications" element={<Notifications />} />
                         <Route path="*" element={<NotFound />} />
                     </Route>
                 </Routes>

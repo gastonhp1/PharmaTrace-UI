@@ -17,7 +17,7 @@ import TermsPanel from "../components/TermsPanel.jsx";
 import RecordHeader from "../components/RecordHeader.jsx";
 import Section from "../components/Section.jsx";
 
-const TONE = { REGISTERED: "neutral", IN_TRANSIT: "transit", IN_DISTRIBUTION: "blue", IN_PHARMACY: "green", DISPENSED: "green", RECALLED: "red" };
+const TONE = { REGISTERED: "neutral", IN_TRANSIT: "transit", IN_DISTRIBUTION: "blue", IN_PHARMACY: "green", DISPENSED: "green", RECALLED: "red", QUARANTINED: "amber" };
 
 // ---- Monografía de un lote ----------------------------------------------------------------------
 
@@ -143,6 +143,7 @@ const FILTERS = [
     { key: "live", label: "En circulación", test: (b) => b.state !== "DISPENSED" && b.state !== "RECALLED" },
     { key: "transit", label: "En tránsito", test: (b) => Boolean(b.pendingTo) },
     { key: "expiring", label: "Por vencer", test: (b) => b.state !== "DISPENSED" && b.state !== "RECALLED" && (daysToExpiry(b.expiryDate) ?? 999) <= 90 },
+    { key: "quarantined", label: "En cuarentena", test: (b) => b.state === "QUARANTINED" },
     { key: "recalled", label: "Retirados", test: (b) => b.state === "RECALLED" },
     { key: "dispensed", label: "Dispensados", test: (b) => b.state === "DISPENSED" },
 ];
