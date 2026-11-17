@@ -84,6 +84,8 @@ Las aplica el chaincode; el UI solo muestra lo que tiene sentido y traduce los e
 - **Condiciones comerciales** (precio, moneda, cantidad): viven en colecciones privadas. Solo las ven
   el vendedor y el comprador de cada tramo; cualquiera puede verificar si unos valores coinciden con
   el hash público sin ver los reales.
+- **Unidades:** los lotes se registran con sus unidades; la ficha permite dividirlos (un lote nuevo con el mismo
+  número de lote, enlazado al original), dispensar de a pocas unidades, y muestra las divisiones y las entregas.
 - **Cuarentena:** los lotes que llegan en un cargamento con la cadena de frío rota quedan `QUARANTINED`; la
   ficha del lote muestra el motivo y le permite al regulador liberarlos o retirarlos.
 - **Cadena de frío:** la valija firma cada lectura (P-256); las lecturas se anclan en bloques con una

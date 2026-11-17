@@ -85,6 +85,8 @@ The chaincode enforces them; the UI only shows what makes sense and translates t
 - **Commercial terms** (price, currency, quantity): kept in private data collections. Only the seller
   and buyer of each leg can read them; anyone can check whether some values match the public hash
   without seeing the real ones.
+- **Units:** batches are registered with their units; the batch page splits them (a new batch with the same lot,
+  linked to its parent), dispenses a few units at a time and lists the splits and the dispensations.
 - **Quarantine:** batches that arrive in a cargo with a broken cold chain are `QUARANTINED`; the batch page
   shows why and lets the regulator release or recall them.
 - **Cold chain:** the case signs each reading (P-256); readings are anchored in windows under a Merkle

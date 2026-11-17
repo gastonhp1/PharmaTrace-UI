@@ -1,19 +1,25 @@
 import { Box, Chip, Stack, Typography } from "@mui/material";
-import { batchStateLabel, formatDateTime, orgLabel, shortHash, translateReason } from "../domain.js";
+import { batchStateLabel, formatDateTime, formatUnits, orgLabel, shortHash, translateReason } from "../domain.js";
 
 // Qué pasó en cada versión del lote, a partir de la diferencia con la anterior.
 function describe(entry, prev) {
     const b = entry.batch;
     if (entry.isDelete || !b) return "Eliminado";
-    if (!prev?.batch) return `Registrado por ${orgLabel(b.manufacturer)}`;
+    if (!prev?.batch) {
+        if (b.parentId) return `Dividido del lote ${b.parentId} por ${orgLabel(b.owner)}: ${formatUnits(b.quantity)}`;
+        return `Registrado por ${orgLabel(b.manufacturer)}${b.quantity ? `: ${formatUnits(b.quantity)}` : ""}`;
+    }
     const p = prev.batch;
+    const dispensed = (b.dispensed ?? 0) - (p.dispensed ?? 0);
     if (b.state === "RECALLED") return `Retirado del mercado${b.recallReason ? `: ${b.recallReason}` : ""}`;
     if (b.state === "QUARANTINED") {
         const where = b.owner !== p.owner ? `Recibido por ${orgLabel(b.owner)} en cuarentena` : "Puesto en cuarentena";
         return `${where}${b.quarantineReason ? `: ${translateReason(b.quarantineReason)}` : ""}`;
     }
     if (p.state === "QUARANTINED") return `Liberado de la cuarentena por el regulador${b.releaseReason ? `: ${b.releaseReason}` : ""}`;
+    if (dispensed > 0) return `Dispensadas ${formatUnits(dispensed)}${b.state === "DISPENSED" ? ": no quedan más" : `; quedan ${b.quantity}`}`;
     if (b.state === "DISPENSED") return "Dispensado al paciente";
+    if ((b.quantity ?? 0) < (p.quantity ?? 0) && b.owner === p.owner) return `Se dividieron ${formatUnits(p.quantity - b.quantity)} a otro lote; quedan ${b.quantity}`;
     if (b.pendingTo && b.pendingTo !== p.pendingTo) return `Despachado de ${orgLabel(b.owner)} a ${orgLabel(b.pendingTo)}`;
     if (b.owner !== p.owner) return `Recibido por ${orgLabel(b.owner)}`;
     if (b.cargo && b.cargo !== p.cargo) return `Agregado al cargamento ${b.cargo}`;
