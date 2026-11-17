@@ -83,11 +83,19 @@ export function batchActions(batch) {
         canDispense: batch.state === "IN_PHARMACY" && !batch.pendingTo && !inCargo,
         canRecall: !done,
         canRelease: quarantined,
+        // Dividir: el dueño, con el lote en la mano y al menos 2 unidades.
+        canSplit: !done && !quarantined && !inCargo && !batch.pendingTo && (batch.quantity ?? 0) >= 2,
         canSetTerms: !done && !quarantined && !batch.pendingTo && Boolean(LEG_BY_OWNER[batch.owner]),
     };
 }
 
 // ---- Formatos -----------------------------------------------------------------------------------
+
+const UNITS = new Intl.NumberFormat("es-AR");
+// "1.000 unidades", "1 unidad".
+export const formatUnits = (n) => `${UNITS.format(n ?? 0)} ${n === 1 ? "unidad" : "unidades"}`;
+// Los lotes registrados antes de que existieran las cantidades tienen 0 y 0.
+export const hasQuantity = (batch) => (batch?.quantity ?? 0) > 0 || (batch?.dispensed ?? 0) > 0;
 
 export function formatDate(iso) {
     if (!iso) return "—";
@@ -132,6 +140,10 @@ export function notificationText(n) {
         case "CargoDissolved":
             return `${lotes(ids.length)} del cargamento ${n.cargoId} ${ids.length === 1 ? "quedó" : "quedaron"} en cuarentena al disolverlo${why}.`;
         case "BatchRecalled":
+            if (ids.length > 1) {
+                const parts = ids.length - 1;
+                return `El lote ${ids[0]} y ${parts === 1 ? "1 lote dividido" : `${parts} lotes divididos`} de él fueron retirados del mercado${why}.`;
+            }
             return `El lote ${ids[0]} fue retirado del mercado${why}.`;
         case "BatchReleased":
             return `El regulador liberó el lote ${ids[0]} de la cuarentena${why}.`;

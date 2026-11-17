@@ -5,9 +5,10 @@ import MoveToInboxIcon from "@mui/icons-material/MoveToInboxOutlined";
 import MedicationIcon from "@mui/icons-material/MedicationOutlined";
 import ReportIcon from "@mui/icons-material/ReportGmailerrorredOutlined";
 import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
+import CallSplitIcon from "@mui/icons-material/CallSplit";
 import * as api from "../api.js";
 import { useAction } from "../hooks/useAction.js";
-import { NEXT_ORG, batchActions, orgLabel } from "../domain.js";
+import { NEXT_ORG, batchActions, formatUnits, hasQuantity, orgLabel } from "../domain.js";
 import SubmitButton from "./SubmitButton.jsx";
 import ErrorAlert from "./ErrorAlert.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
@@ -17,6 +18,9 @@ import ConfirmDialog from "./ConfirmDialog.jsx";
 export default function BatchActions({ batch, onChanged }) {
     const can = batchActions(batch);
     const [patientRef, setPatientRef] = useState("");
+    const [units, setUnits] = useState("");
+    const [splitId, setSplitId] = useState("");
+    const [splitUnits, setSplitUnits] = useState("");
     const [reason, setReason] = useState("");
     const [releaseReason, setReleaseReason] = useState("");
     const [confirmRelease, setConfirmRelease] = useState(false);
@@ -28,9 +32,17 @@ export default function BatchActions({ batch, onChanged }) {
     const [dispense, dispenseState] = useAction(api.dispenseBatch);
     const [recall, recallState] = useAction(api.recallBatch);
     const [release, releaseState] = useAction(api.releaseBatch);
+    const [split, splitState] = useAction(api.splitBatch);
 
-    const error = dispatchState.error || receiveState.error || dispenseState.error || recallState.error || releaseState.error;
-    const busy = dispatchState.loading || receiveState.loading || dispenseState.loading || recallState.loading || releaseState.loading;
+    const states = [dispatchState, receiveState, dispenseState, recallState, releaseState, splitState];
+    const error = states.find((s) => s.error)?.error;
+    const busy = states.some((s) => s.loading);
+    const counted = hasQuantity(batch);
+    // Unidades a dispensar: vacío = todas las que quedan.
+    const unitsNumber = units === "" ? undefined : Number(units);
+    const unitsOk = unitsNumber === undefined || (Number.isInteger(unitsNumber) && unitsNumber >= 1 && unitsNumber <= batch.quantity);
+    const splitNumber = Number(splitUnits);
+    const splitOk = splitId.trim() !== "" && Number.isInteger(splitNumber) && splitNumber >= 1 && splitNumber < (batch.quantity ?? 0);
     const next = NEXT_ORG[batch.owner];
 
     const done = async (promise, message) => {
@@ -41,7 +53,7 @@ export default function BatchActions({ batch, onChanged }) {
         }
     };
 
-    const nothing = !can.canDispatch && !can.canReceive && !can.canDispense && !can.canRecall;
+    const nothing = !can.canDispatch && !can.canReceive && !can.canDispense && !can.canRecall && !can.canSplit;
 
     return (
         <Box>
@@ -103,7 +115,11 @@ export default function BatchActions({ batch, onChanged }) {
                             spacing={1.5}
                             onSubmit={(e) => {
                                 e.preventDefault();
-                                done(dispense({ batchId: batch.id, patientRef: patientRef.trim() }), "Dispensado. Se guardó solo el hash de la referencia.").then(() => setPatientRef(""));
+                                const message = unitsNumber === undefined ? "Dispensado. Se guardó solo el hash de la referencia." : `Dispensadas ${formatUnits(unitsNumber)}. Se guardó solo el hash de la referencia.`;
+                                done(dispense({ batchId: batch.id, patientRef: patientRef.trim(), quantity: unitsNumber }), message).then(() => {
+                                    setPatientRef("");
+                                    setUnits("");
+                                });
                             }}
                         >
                             <TextField
@@ -113,9 +129,67 @@ export default function BatchActions({ batch, onChanged }) {
                                 helperText="No se guarda: el backend registra solo su hash SHA-256."
                                 required
                             />
+                            {counted && (
+                                <TextField
+                                    label="Unidades"
+                                    type="number"
+                                    value={units}
+                                    onChange={(e) => setUnits(e.target.value)}
+                                    error={!unitsOk}
+                                    placeholder={`Todas (${batch.quantity})`}
+                                    helperText={`Vacío: las ${batch.quantity} que quedan.`}
+                                    slotProps={{ htmlInput: { min: 1, max: batch.quantity, step: 1, inputMode: "numeric" }, inputLabel: { shrink: true } }}
+                                    sx={{ maxWidth: { sm: 160 } }}
+                                />
+                            )}
                             <Box>
-                                <SubmitButton loading={dispenseState.loading} startIcon={<MedicationIcon />} disabled={!patientRef.trim() || busy} sx={{ minWidth: 150, height: 56 }}>
+                                <SubmitButton loading={dispenseState.loading} startIcon={<MedicationIcon />} disabled={!patientRef.trim() || !unitsOk || busy} sx={{ minWidth: 150, height: 56 }}>
                                     Dispensar
+                                </SubmitButton>
+                            </Box>
+                        </Stack>
+                    )}
+
+                    {can.canSplit && (
+                        <Stack
+                            component="form"
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.5}
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                const newBatchId = splitId.trim();
+                                done(
+                                    split({ batchId: batch.id, newBatchId, quantity: splitNumber }),
+                                    `Se pasaron ${formatUnits(splitNumber)} al lote ${newBatchId}. Ese lote ya se puede despachar por su cuenta.`
+                                ).then(() => {
+                                    setSplitId("");
+                                    setSplitUnits("");
+                                });
+                            }}
+                        >
+                            <TextField
+                                label="ID del lote nuevo"
+                                value={splitId}
+                                onChange={(e) => setSplitId(e.target.value)}
+                                placeholder={`Ej.: ${batch.id}-FARMA1`}
+                                helperText="Mismo producto, número de lote y vencimiento."
+                                required
+                                slotProps={{ inputLabel: { shrink: true } }}
+                            />
+                            <TextField
+                                label="Unidades"
+                                type="number"
+                                value={splitUnits}
+                                onChange={(e) => setSplitUnits(e.target.value)}
+                                error={splitUnits !== "" && !splitOk && splitId.trim() !== ""}
+                                helperText={`De 1 a ${batch.quantity - 1}.`}
+                                required
+                                slotProps={{ htmlInput: { min: 1, max: batch.quantity - 1, step: 1, inputMode: "numeric" } }}
+                                sx={{ maxWidth: { sm: 160 } }}
+                            />
+                            <Box>
+                                <SubmitButton loading={splitState.loading} variant="outlined" startIcon={<CallSplitIcon />} disabled={!splitOk || busy} sx={{ minWidth: 150, height: 56 }}>
+                                    Dividir
                                 </SubmitButton>
                             </Box>
                         </Stack>
@@ -181,7 +255,7 @@ export default function BatchActions({ batch, onChanged }) {
             <ConfirmDialog
                 open={confirmRecall}
                 title={`¿Retirar el lote ${batch.id} del mercado?`}
-                text="Lo firma el regulador y es definitivo: el lote no vuelve a cambiar de estado."
+                text="Lo firma el regulador y es definitivo: el lote no vuelve a cambiar de estado. También se retiran los lotes que se dividieron de él y no se dispensaron, estén donde estén."
                 confirmLabel="Retirar lote"
                 color="error"
                 onClose={() => setConfirmRecall(false)}

@@ -5,7 +5,7 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import * as api from "../api.js";
 import { useAction } from "../hooks/useAction.js";
-import { daysToExpiry, formatDate, formatDateTime, formatExpiryShort, indexLetter, matchesBatch, orgLabel, shortHash, whereIs } from "../domain.js";
+import { daysToExpiry, formatDate, formatDateTime, formatExpiryShort, formatUnits, hasQuantity, indexLetter, matchesBatch, orgLabel, shortHash, whereIs } from "../domain.js";
 import PageHeader from "../components/PageHeader.jsx";
 import ErrorAlert from "../components/ErrorAlert.jsx";
 import StateChip from "../components/StateChip.jsx";
@@ -34,16 +34,76 @@ function Datum({ label, children }) {
     );
 }
 
+const batchLink = (id) => `/batches/${encodeURIComponent(id)}`;
+
+// Lo dividido de este lote y lo que se entregó a pacientes.
+function UnitsPanel({ batch, splits, dispensations }) {
+    const list = splits ?? [];
+    const given = dispensations ?? [];
+    return (
+        <>
+            {list.length === 0 ? (
+                <Typography color="text.secondary">
+                    No se dividió. {batch.quantity >= 2 ? "Quien lo tiene puede pasar unidades a un lote nuevo para mandarlas a otro destino." : ""}
+                </Typography>
+            ) : (
+                <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }} aria-label="Lotes divididos de este">
+                    {list.map((s) => (
+                        <Box component="li" key={s.id} sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center", py: 1, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0, pt: 0 } }}>
+                            <Link component={RouterLink} to={batchLink(s.id)} underline="hover" sx={{ fontWeight: 600 }}>
+                                {s.id}
+                            </Link>
+                            <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                                {formatUnits(s.quantity)}
+                                {s.dispensed ? ` (y ${s.dispensed} dispensadas)` : ""}
+                            </Typography>
+                            <StateChip state={s.state} />
+                            <Typography variant="body2" color="text.secondary">
+                                {whereIs(s)}
+                            </Typography>
+                        </Box>
+                    ))}
+                </Box>
+            )}
+            {given.length > 0 && (
+                <>
+                    <Typography variant="subtitle2" sx={{ mt: 2.5, mb: 0.5 }}>
+                        Entregas a pacientes
+                    </Typography>
+                    <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }} aria-label="Dispensas">
+                        {given.map((d) => (
+                            <Box component="li" key={d.txId} sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, py: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums", minWidth: 110 }}>
+                                    {d.quantity ? formatUnits(d.quantity) : "Lote entero"}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {formatDateTime(d.at)} · {orgLabel(d.pharmacy)} · paciente <code title={d.patientRef}>{shortHash(d.patientRef, 8)}</code>
+                                </Typography>
+                            </Box>
+                        ))}
+                    </Box>
+                </>
+            )}
+        </>
+    );
+}
+
 function BatchMonograph({ batchId }) {
     const { catalog } = useOutletContext();
     const reloadCatalog = catalog.reload;
     const [loadBatch, { loading, error, data: batch }, reset] = useAction(api.getBatch);
     const [loadHistory, historyState] = useAction(api.getBatchHistory);
+    const [loadSplits, splitsState] = useAction(api.getBatchSplits);
+    const [loadDispensations, dispensationsState] = useAction(api.getDispensations);
 
     const refresh = useCallback(async () => {
         const b = await loadBatch(batchId);
-        if (b) loadHistory(batchId);
-    }, [batchId, loadBatch, loadHistory]);
+        if (b) {
+            loadHistory(batchId);
+            loadSplits(batchId);
+            loadDispensations(batchId);
+        }
+    }, [batchId, loadBatch, loadHistory, loadSplits, loadDispensations]);
 
     useEffect(() => {
         reset();
@@ -84,6 +144,26 @@ function BatchMonograph({ batchId }) {
                 <Section title="Ficha del lote">
                     <Box component="dl" sx={{ m: 0 }}>
                         <Datum label="Elaborador">{orgLabel(batch.manufacturer)}</Datum>
+                        <Datum label="Unidades">
+                            {hasQuantity(batch) ? (
+                                <>
+                                    {formatUnits(batch.quantity)} en este lote
+                                    {batch.dispensed > 0 && `, ${batch.dispensed} ya dispensadas`}
+                                </>
+                            ) : (
+                                "Sin cantidad registrada (lote anterior a las cantidades): se mueve y se dispensa entero"
+                            )}
+                        </Datum>
+                        {batch.parentId && (
+                            <Datum label="Dividido del lote">
+                                <Link component={RouterLink} to={batchLink(batch.parentId)} underline="hover">
+                                    {batch.parentId}
+                                </Link>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                                    Si el regulador retira ese lote, este se retira con él.
+                                </Typography>
+                            </Datum>
+                        )}
                         <Datum label="En custodia de">{orgLabel(batch.owner)}</Datum>
                         <Datum label="Ubicación">{whereIs(batch)}</Datum>
                         <Datum label="Vencimiento">{formatDate(batch.expiryDate)}</Datum>
@@ -97,7 +177,7 @@ function BatchMonograph({ batchId }) {
                             )}
                         </Datum>
                         {batch.patientRef && (
-                            <Datum label="Referencia del paciente">
+                            <Datum label={batch.dispensed > 0 && batch.state !== "DISPENSED" ? "Última referencia de paciente" : "Referencia del paciente"}>
                                 <code title={batch.patientRef}>{shortHash(batch.patientRef, 12)}</code>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                                     Hash SHA-256: el dato original no se guarda en la cadena.
@@ -112,6 +192,13 @@ function BatchMonograph({ batchId }) {
                         )}
                     </Box>
                 </Section>
+
+                {hasQuantity(batch) && (
+                    <Section title="Divisiones y entregas" hint="Lotes que salieron de este al dividirlo, y las unidades entregadas a pacientes.">
+                        <ErrorAlert error={splitsState.error || dispensationsState.error} sx={{ mb: 2 }} />
+                        <UnitsPanel batch={batch} splits={splitsState.data} dispensations={dispensationsState.data} />
+                    </Section>
+                )}
 
                 <Section title="Acciones" hint="Las firma el backend con la identidad de la organización que corresponde.">
                     <BatchActions
