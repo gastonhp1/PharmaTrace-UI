@@ -36,6 +36,18 @@ const RULES = [
     [/^batch (.+) is (\w+), it has to be IN_PHARMACY to be dispensed$/, (id, s) => `El lote ${id} está ${state(s)}: tiene que estar en farmacia para dispensarlo.`],
     [/^batch (.+) is still in cargo (.+)$/, (id, c) => `El lote ${id} sigue dentro del cargamento ${c}.`],
     [/^batch (.+) belongs to (.+), not to (.+)$/, (id, owner, caller) => `El lote ${id} es de ${owner}, no de ${caller}.`],
+    // ---- unidades y divisiones
+    [/^quantity has to be between 1 and (\d+) units$/, (max) => `La cantidad tiene que estar entre 1 y ${Number(max).toLocaleString("es-AR")} unidades.`],
+    [/^a split takes between 1 and (\d+) units \(batch (.+) has (\d+)\)$/, (max, id, has) => `Una división lleva entre 1 y ${max} unidades: el lote ${id} tiene ${has}.`],
+    [/^quantity has to be between 1 and (\d+) \(the units left in batch (.+)\)$/, (max, id) => `Al lote ${id} le quedan ${max} unidades: no se pueden dispensar más.`],
+    [/^batch (.+) travels in cargo (.+): it can be split once the cargo is received or dissolved$/, (id, c) => `El lote ${id} viaja en el cargamento ${c}: se puede dividir cuando el cargamento se reciba o se disuelva.`],
+    [/^batch (.+) is in transit to (.+): it can be split once received$/, (id, to) => `El lote ${id} está en tránsito hacia ${to}: se puede dividir cuando lo reciba.`],
+    [/^batch (.+) has no quantity recorded: it can only move whole$/, (id) => `El lote ${id} no tiene cantidad registrada (es anterior a las cantidades): solo se mueve entero.`],
+    [/^batch (.+) has no quantity recorded: dispense it whole$/, (id) => `El lote ${id} no tiene cantidad registrada: se dispensa entero.`],
+    [/^batch (.+) has 1 unit left: there is nothing to split$/, (id) => `Al lote ${id} le queda 1 unidad: no hay nada para dividir.`],
+    [/^batch (.+) and the batches split from it were already dispensed or recalled$/, (id) => `El lote ${id} y los divididos de él ya fueron dispensados o retirados: no queda nada para retirar.`],
+    [/^batch (.+) has (\d+) or more batches split from it: recall them in parts.*$/, (id, n) => `Del lote ${id} salieron ${n} lotes o más: retirá primero los divididos, por partes.`],
+
     [/^batch (.+) is QUARANTINED \(.*\): only the regulator can release or recall it$/, (id) => `El lote ${id} está en cuarentena por la cadena de frío: solo el regulador puede liberarlo o retirarlo.`],
     [/^batch (.+) is (\w+), not QUARANTINED$/, (id, s) => `El lote ${id} está ${state(s)}, no en cuarentena.`],
     [/^a release needs a reason$/, () => "Liberar un lote de la cuarentena necesita un motivo."],

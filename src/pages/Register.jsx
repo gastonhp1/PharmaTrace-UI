@@ -8,7 +8,8 @@ import PageHeader from "../components/PageHeader.jsx";
 import SubmitButton from "../components/SubmitButton.jsx";
 import ErrorAlert from "../components/ErrorAlert.jsx";
 
-const EMPTY = { batchId: "", gtin: "", product: "", lot: "", expiryDate: "" };
+const EMPTY = { batchId: "", gtin: "", product: "", lot: "", expiryDate: "", quantity: "" };
+const MAX_QUANTITY = 10_000_000;
 
 export default function Register() {
     const [form, setForm] = useState(EMPTY);
@@ -17,7 +18,9 @@ export default function Register() {
 
     const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
     const gtinOk = GTIN_RE.test(form.gtin);
-    const valid = form.batchId.trim() && gtinOk && form.product.trim() && form.lot.trim() && form.expiryDate;
+    const quantity = Number(form.quantity);
+    const quantityOk = Number.isInteger(quantity) && quantity >= 1 && quantity <= MAX_QUANTITY;
+    const valid = form.batchId.trim() && gtinOk && form.product.trim() && form.lot.trim() && form.expiryDate && quantityOk;
 
     const submit = async (e) => {
         e.preventDefault();
@@ -28,6 +31,7 @@ export default function Register() {
             product: form.product.trim(),
             lot: form.lot.trim(),
             expiryDate: form.expiryDate,
+            quantity,
         });
         if (batch) {
             setCreated(batch);
@@ -61,6 +65,17 @@ export default function Register() {
                             <TextField label="Número de lote" value={form.lot} onChange={set("lot")} required />
                             <TextField label="Vencimiento" type="date" value={form.expiryDate} onChange={set("expiryDate")} required slotProps={{ inputLabel: { shrink: true } }} />
                         </Stack>
+                        <TextField
+                            label="Unidades"
+                            type="number"
+                            value={form.quantity}
+                            onChange={set("quantity")}
+                            required
+                            error={form.quantity !== "" && !quantityOk}
+                            helperText="Cuántas unidades tiene el lote. Después se puede dividir para mandar partes a distintos destinos."
+                            slotProps={{ htmlInput: { min: 1, max: MAX_QUANTITY, step: 1, inputMode: "numeric" } }}
+                            sx={{ maxWidth: 260 }}
+                        />
                         <Box>
                             <SubmitButton loading={loading} disabled={!valid}>
                                 Registrar lote

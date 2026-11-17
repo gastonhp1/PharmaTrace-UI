@@ -90,16 +90,24 @@ export const registerOrg = ({ mspId, role }) => post("/api/orgs", { mspId, role 
 // ---- Lotes ------------------------------------------------------------------------------------
 // batch: { id, gtin, product, lot, expiryDate, manufacturer, owner, pendingTo, state, cargo,
 //          patientRef, recallReason, stateBefore, quarantineReason, quarantineCargo, releaseReason,
-//          lastUpdatedAt, lastTxId }
+//          quantity (unidades que quedan), dispensed, parentId (lote del que se dividió), lastUpdatedAt, lastTxId }
 export const getBatch = (batchId) => request(`/api/batches/${enc(batchId)}`);
 // -> [{ txId, timestamp, isDelete, batch }] del más viejo al más nuevo
 export const getBatchHistory = (batchId) => request(`/api/batches/${enc(batchId)}/history`);
 
-export const registerBatch = ({ batchId, gtin, product, lot, expiryDate }) =>
-    post("/api/batches", { batchId, gtin, product, lot, expiryDate });
+export const registerBatch = ({ batchId, gtin, product, lot, expiryDate, quantity }) =>
+    post("/api/batches", { batchId, gtin, product, lot, expiryDate, quantity });
+// El dueño pasa `quantity` unidades a un lote nuevo. -> el lote nuevo
+export const splitBatch = ({ batchId, newBatchId, quantity }) => post(`/api/batches/${enc(batchId)}/split`, { newBatchId, quantity });
+// all: también lo dividido de lo dividido (lo que alcanza un retiro).
+export const getBatchSplits = (batchId, { all = false } = {}) => request(`/api/batches/${enc(batchId)}/splits${all ? "?all=true" : ""}`);
+// -> [{ batchId, quantity, patientRef, pharmacy, at, txId }]
+export const getDispensations = (batchId) => request(`/api/batches/${enc(batchId)}/dispensations`);
 export const dispatchBatch = ({ batchId, to }) => post(`/api/batches/${enc(batchId)}/dispatch`, { to });
 export const receiveBatch = ({ batchId }) => post(`/api/batches/${enc(batchId)}/receive`);
-export const dispenseBatch = ({ batchId, patientRef }) => post(`/api/batches/${enc(batchId)}/dispense`, { patientRef });
+// Sin quantity se dispensan todas las unidades que quedan.
+export const dispenseBatch = ({ batchId, patientRef, quantity }) =>
+    post(`/api/batches/${enc(batchId)}/dispense`, quantity === undefined ? { patientRef } : { patientRef, quantity });
 export const recallBatch = ({ batchId, reason }) => post(`/api/batches/${enc(batchId)}/recall`, { reason });
 // El regulador levanta una cuarentena por cadena de frío.
 export const releaseBatch = ({ batchId, reason }) => post(`/api/batches/${enc(batchId)}/release`, { reason });
